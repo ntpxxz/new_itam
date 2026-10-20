@@ -44,7 +44,8 @@ npm run build    # build client ไปที่ dist/
 npm start        # Express เสิร์ฟ dist/ ที่พอร์ต 3093
 ```
 
-- เปลี่ยนพอร์ตด้วย `PORT=8080 npm start`
+- ตั้งค่าผ่านไฟล์ `.env` — คัดลอกจาก [`.env.example`](.env.example) (`PORT`, `DB_PATH`, `COOKIE_SECURE`, `NODE_ENV`); ทุกค่ามีค่าเริ่มต้น ไม่สร้างไฟล์ก็ใช้งานได้
+- ใช้ HTTPS ผ่าน reverse proxy ให้ตั้ง `COOKIE_SECURE=1`
 - เซิร์ฟเวอร์ฟังที่ `0.0.0.0` เพื่อให้มือถือในวง LAN เปิดลิงก์จาก QR ได้ — ตั้ง URL ที่ใช้ใน QR ได้ที่หน้า ตั้งค่า
 - กล้องสแกนในเบราว์เซอร์ต้องใช้ HTTPS หรือ localhost; ถ้าไม่มีให้พิมพ์รหัสหรือใช้กล้องมือถือสแกน QR แทน
 
