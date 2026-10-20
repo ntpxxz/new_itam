@@ -54,7 +54,7 @@ export default function AssetDetail() {
 
   return (
     <>
-      <PageHeader title={a.name} crumbs={[{ label: 'อุปกรณ์', to: '/assets' }, { label: a.asset_tag }]}>
+      <PageHeader title={a.name} crumbs={[{ label: 'อุปกรณ์', to: '/assets' }, { label: a.category_name, to: `/assets?category_id=${a.category_id}` }, { label: a.asset_tag }]}>
         <Menu label="การทำงานเพิ่มเติม" buttonClass="icon-btn" items={[
           { label: 'พิมพ์สติ๊กเกอร์', to: `/labels?ids=${a.id}`, icon: <Printer size={15} /> },
           can('log.view') && { label: 'ดู Audit Trail', to: `/logs?tab=audit&entity=asset&entity_id=${a.id}`, icon: <ScrollText size={15} /> },
@@ -77,7 +77,7 @@ export default function AssetDetail() {
               <div className="stack" style={{ gap: 8, minWidth: 0 }}>
                 <div className="row-wrap">
                   <StatusChip status={a.status} />
-                  <span className="chip chip-neutral no-dot">{a.category_name}</span>
+                  <Link to={`/assets?category_id=${a.category_id}`} className="chip chip-neutral no-dot" title="ดูอุปกรณ์ทั้งหมดในหมวดนี้">{a.category_name}</Link>
                 </div>
                 <div className="mono" style={{ fontSize: 16, fontWeight: 600 }}>{a.asset_tag}</div>
                 <div className="muted" style={{ fontSize: 13 }}>{[a.brand, a.model].filter(Boolean).join(' · ') || '—'}</div>

@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader, Tabs, Chip } from '../components/ui.jsx';
 import MasterTable from '../components/MasterTable.jsx';
 
@@ -20,11 +20,12 @@ export default function MasterData() {
       <Tabs tabs={TABS} value={tab} onChange={(t) => setSp({ tab: t }, { replace: true })} />
       {tab === 'categories' && (
         <MasterTable key="c" table="categories" title="หมวดหมู่" addLabel="เพิ่มหมวดหมู่" columns={[
-          { key: 'name', label: 'ชื่อหมวดหมู่', input: 'text', required: true },
+          { key: 'name', label: 'ชื่อหมวดหมู่', input: 'text', required: true, render: (r) => <Link to={`/assets?category_id=${r.id}`}>{r.name}</Link> },
           { key: 'kind', label: 'วิธีติดตาม', input: 'select', options: KIND, required: true, default: 'asset',
             render: (r) => (r.kind === 'asset' ? <Chip tone="brand" dot={false}>รายชิ้น</Chip> : <Chip tone="success" dot={false}>นับจำนวน</Chip>) },
           { key: 'prefix', label: 'Prefix รหัส', input: 'text', required: true, mono: true, upper: true, max: 6, hint: 'ใช้นำหน้ารหัสทรัพย์สิน เช่น NB → NB-2026-00001' },
-          { key: 'usage', label: 'จำนวนรายการ', mono: true, render: (r) => r.usage },
+          { key: 'usage', label: 'จำนวนรายการ', mono: true,
+            render: (r) => (r.usage ? <Link to={`/assets?category_id=${r.id}`} title={`ดูรายการในหมวด ${r.name}`}>{r.usage}</Link> : 0) },
         ]} />
       )}
       {tab === 'locations' && (
