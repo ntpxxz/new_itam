@@ -108,7 +108,7 @@ export default function Reports() {
                     <Fragment key={k}>
                       <tr className="clickable" onClick={() => toggle(k)} aria-expanded={isOpen}>
                         <td>{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                        <td className="cell-main">{d.department_name}<div className="cell-sub">{d.sections.filter((s) => s.section).length} Section</div></td>
+                        <td className="cell-main">{d.department_name}</td>
                         <td className="text-right mono">{fmtNum(d.assets_issued)}</td>
                         <td className="text-right mono">{fmtNum(d.assets_borrowed)}</td>
                         <td className="text-right mono">{fmtNum(d.units)}</td>
@@ -153,17 +153,17 @@ export default function Reports() {
 }
 
 function DeptDetail({ d }) {
-  const [tab, setTab] = useState('sections');
+  const [tab, setTab] = useState('items');
   return (
     <div className="stack" style={{ gap: 10 }}>
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'sections', label: `แยกตาม Section (${d.sections.length})` }, { value: 'items', label: `รายการที่เบิก (${d.items.length})` }]} />
-      {tab === 'sections' ? (
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'items', label: `รายการที่เบิก (${d.items.length})` }, { value: 'recipients', label: `แยกตามผู้รับ (${d.recipients.length})` }]} />
+      {tab === 'recipients' ? (
         <table className="table compact" style={{ background: 'var(--bg-surface)' }}>
-          <thead><tr><th>Section</th><th className="text-right">รายชิ้น</th><th className="text-right">นับจำนวน</th><th className="text-right">มูลค่า</th></tr></thead>
+          <thead><tr><th>ผู้รับ</th><th className="text-right">รายชิ้น</th><th className="text-right">นับจำนวน</th><th className="text-right">มูลค่า</th></tr></thead>
           <tbody>
-            {d.sections.map((s) => (
-              <tr key={s.section || '—'}>
-                <td>{s.section || <span className="subtle">ไม่ระบุ Section</span>}</td>
+            {d.recipients.map((s) => (
+              <tr key={s.person_id ?? 'none'}>
+                <td>{s.person_name || <span className="subtle">ทั้งแผนก (ไม่ระบุชื่อ)</span>}</td>
                 <td className="text-right mono">{fmtNum(s.assets)}</td>
                 <td className="text-right mono">{fmtNum(s.units)}</td>
                 <td className="text-right mono">{fmtMoney(s.value)}</td>

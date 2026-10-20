@@ -47,11 +47,11 @@ export default function ActionDialog({ asset, action, onClose, onDone }) {
   const submit = async (e) => {
     e.preventDefault();
     const errs = {};
-    if (needs.includes('recipient') && !hasRecipient(who)) errs.recipient = 'กรอกชื่อผู้รับ หรือ Section อย่างน้อยหนึ่งอย่าง';
+    if (needs.includes('recipient') && !hasRecipient(who)) errs.recipient = 'กรอกชื่อผู้รับ หรือแผนก อย่างน้อยหนึ่งอย่าง';
     if (needs.includes('due_date') && !v.due_date) errs.due_date = 'กรุณาระบุวันกำหนดคืน';
     if (needs.includes('note') && !v.note.trim()) errs.note = 'กรุณากรอกข้อมูลนี้';
     if (needs.includes('evidence') && !file) errs.evidence = 'ต้องแนบหลักฐาน เช่น ใบอนุมัติจำหน่าย หรือรูปถ่าย';
-    if (action.key === 'transfer' && !hasRecipient(who) && !who.department_name.trim() && !v.location_id) errs.recipient = 'ระบุปลายทางอย่างน้อย 1 อย่าง';
+    if (action.key === 'transfer' && !hasRecipient(who) && !v.location_id) errs.recipient = 'ระบุปลายทางอย่างน้อย 1 อย่าง';
     setErr(errs);
     if (Object.keys(errs).length) return;
 
@@ -88,7 +88,7 @@ export default function ActionDialog({ asset, action, onClose, onDone }) {
         <div className="holder">
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="cell-main">{asset.name}</div>
-            <div className="tag">{asset.asset_tag}{(asset.holder_name || asset.holder_section) && ` · ถือครองโดย ${[asset.holder_name, asset.holder_section].filter(Boolean).join(' · ')}`}</div>
+            <div className="tag">{asset.asset_tag}{(asset.holder_name || (['borrowed', 'issued'].includes(asset.status) && asset.department_name)) && ` · ถือครองโดย ${asset.holder_name || asset.department_name}`}</div>
           </div>
           <div className="row" style={{ gap: 6, fontSize: 12 }}>
             <StatusChip status={asset.status} />

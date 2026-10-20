@@ -77,7 +77,7 @@ export default function Dashboard() {
             <div className="alert">
               <AlertTriangle size={18} aria-hidden />
               <strong>เกินกำหนดคืน {data.overdue.length} รายการ</strong>
-              <span className="alert-detail">นานสุด {Math.abs(daysFromToday(data.overdue[0].due_date))} วัน — {data.overdue[0].name} ({who(data.overdue[0].holder_name, data.overdue[0].holder_section)})</span>
+              <span className="alert-detail">นานสุด {Math.abs(daysFromToday(data.overdue[0].due_date))} วัน — {data.overdue[0].name} ({who(data.overdue[0].holder_name, data.overdue[0].department_name)})</span>
               <Link to="/loans?filter=overdue">ดูทั้งหมด →</Link>
             </div>
           )}
@@ -129,7 +129,7 @@ export default function Dashboard() {
                     {data.overdue.slice(0, 8).map((a) => (
                       <tr key={a.id}>
                         <td><Link to={`/assets/${a.id}`} className="cell-main">{a.name}</Link><div className="tag">{a.asset_tag}</div></td>
-                        <td>{who(a.holder_name, a.holder_section)}<div className="cell-sub">{a.department_name}</div></td>
+                        <td>{who(a.holder_name, a.department_name)}<div className="cell-sub">{a.holder_name ? a.department_name : 'ทั้งแผนก'}</div></td>
                         <td className="nowrap">{fmtDate(a.due_date)}</td>
                         <td className="text-right"><span className="chip chip-danger">{Math.abs(daysFromToday(a.due_date))} วัน</span></td>
                       </tr>

@@ -92,15 +92,15 @@ available ──transfer──▶ available (location/department move)
 - Issue date (`doc_date`) may be backdated: not in the future, and for each asset not before its `received_date` or latest movement. Borrow due date must be ≥ `doc_date`. History rows keep `created_at` as the record time; the effective date comes from `documents.doc_date` (shown as วันที่ … · บันทึก …).
 - Always reuse `applyAction` / `createAsset` / `moveStock` so rules, history and audit stay in one place.
 
-### Recipients: free text + Section — `server/recipient.js`
-- Borrow / issue / transfer / stock-out take **typed** `person_name`, `department_name`, `section` (UI: `RecipientFields`, inputs with datalist suggestions — no dropdowns).
-- **Name is optional.** A recipient needs a name **or** a section (e.g. "ห้องประชุม ชั้น 5"). Stock-out from the item page needs neither.
+### Recipients: free text name + แผนก — `server/recipient.js`
+- Borrow / issue / transfer / stock-out take **typed** `person_name`, `department_name` (UI: `RecipientFields`, inputs with datalist suggestions — no dropdowns).
+- **Name is optional.** A recipient needs a name **or** a department (แผนก) — issuing to a department as a whole leaves `holder_person_id` NULL. Stock-out from the item page needs neither.
+- "Section" = แผนก (per user). There is no separate section field; the legacy `section` / `holder_section` columns stay in the schema (additive migrations) but are unused.
 - `resolveRecipient()` links an exact (case-insensitive) name/department to the existing record, otherwise creates it (audited), so reports group correctly.
-- Section is free text stored on `assets.holder_section`, `documents.section`, `asset_transactions.section`, `stock_movements.section`; suggestions come from `GET /api/master/sections`.
-- Display holders with `who(name, section)` from `client/src/format.js`.
+- Display holders with `who(name, department)` (person, else department) and `isHeld(asset)` from `client/src/format.js`.
 
 ### Report: สรุปการเบิกตามแผนก — `/reports/issues`, `server/routes/reports.js`
-- Counts asset `issue`/`borrow` transactions and consumable `out` movements by effective date (slip `doc_date`, else local record date), grouped by department → section → item; Excel export (3 sheets).
+- Counts asset `issue`/`borrow` transactions and consumable `out` movements by effective date (slip `doc_date`, else local record date), grouped by department → item / recipient; Excel export (3 sheets: by department, by recipient, line detail).
 - Value: assets = purchase price, consumables = qty × current unit cost. Permission `report.view` (+ `report.export` for Excel).
 - New permissions are granted to default roles on existing DBs by `bootstrap()` (only keys added in that version).
 
@@ -160,7 +160,7 @@ available ──transfer──▶ available (location/department move)
 - [x] Consumables: stock in / issue out / adjust, reorder point
 - [x] Unified register (assets + consumables in one list, split by category) · received date field
 - [x] รับเข้า / เบิกออก menus: multi-line slips, scan-to-add, printable slip with signature lines
-- [x] Backdated issue/receive dates · free-text recipient with optional name + Section · report สรุปการเบิกตามแผนก
+- [x] Backdated issue/receive dates · free-text recipient with optional name + แผนก · report สรุปการเบิกตามแผนก
 
 ### Phase 2 ✅ (this build)
 - [x] Dashboard: KPI by status, overdue returns, warranty ≤ 30 days, low stock, monthly purchase spend, activity feed

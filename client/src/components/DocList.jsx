@@ -31,7 +31,7 @@ export default function DocList({ type, title, limit = 10 }) {
                   <td>
                     {type === 'receive'
                       ? <>{d.vendor_name || '—'}{d.po_number && <div className="tag">{d.po_number}</div>}</>
-                      : <>{who(d.person_name, d.section) || '—'}<div className="cell-sub">{d.department_name}</div></>}
+                      : <>{who(d.person_name, d.department_name) || '—'}<div className="cell-sub">{d.person_name ? d.department_name : 'ทั้งแผนก'}</div></>}
                   </td>
                   <td className="text-right nowrap">
                     {d.asset_count > 0 && <div><span className="mono">{fmtNum(d.asset_count)}</span> <span className="muted">ชิ้น (รายชิ้น)</span></div>}

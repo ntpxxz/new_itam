@@ -66,7 +66,7 @@ export function MoveDialog({ item, type, onClose, onDone }) {
           <div className="form-grid">
             <RecipientFields value={who} onChange={setWho} required={false} compact />
           </div>
-          <p className="field-hint" style={{ marginTop: -6 }}>ไม่บังคับ — กรอกแผนก/Section เพื่อให้รายงานสรุปการเบิกตามแผนกครบถ้วน</p>
+          <p className="field-hint" style={{ marginTop: -6 }}>ไม่บังคับ — กรอกแผนกเพื่อให้รายงานสรุปการเบิกตามแผนกครบถ้วน</p>
         </>)}
         {type === 'in' && (
           <Field label="วันที่รับเข้า" required error={err.received_date}>

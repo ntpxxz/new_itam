@@ -11,7 +11,7 @@ const r = Router();
 // Effective date = slip date when issued through a slip, otherwise the local record date.
 const LINES = `
   SELECT * FROM (
-    SELECT 'asset' AS kind, t.action AS mode, t.department_id, t.section, t.person_id, t.doc_id,
+    SELECT 'asset' AS kind, t.action AS mode, t.department_id, t.person_id, t.doc_id,
            1 AS qty, 'ชิ้น' AS unit, COALESCE(a.purchase_price, 0) AS value,
            a.asset_tag AS code, a.name, c.name AS category_name,
            COALESCE(doc.doc_date, date(t.created_at, 'localtime')) AS eff_date
@@ -20,7 +20,7 @@ const LINES = `
     LEFT JOIN documents doc ON doc.id = t.doc_id
     WHERE t.action IN ('issue', 'borrow')
     UNION ALL
-    SELECT 'consumable', 'issue', m.department_id, m.section, m.person_id, m.doc_id,
+    SELECT 'consumable', 'issue', m.department_id, m.person_id, m.doc_id,
            m.qty, x.unit, m.qty * COALESCE(x.unit_cost, 0),
            x.sku, x.name, c.name,
            COALESCE(doc.doc_date, date(m.created_at, 'localtime'))
@@ -51,7 +51,7 @@ function summarize(lines) {
     if (!depts.has(key)) {
       depts.set(key, {
         department_id: l.department_id, department_name: l.department_name || 'ไม่ระบุแผนก',
-        assets_issued: 0, assets_borrowed: 0, units: 0, value: 0, people: new Set(), slips: new Set(), sections: new Map(), items: new Map(),
+        assets_issued: 0, assets_borrowed: 0, units: 0, value: 0, people: new Set(), slips: new Set(), recipients: new Map(), items: new Map(),
       });
     }
     const d = depts.get(key);
@@ -61,11 +61,11 @@ function summarize(lines) {
     if (l.person_id) d.people.add(l.person_id);
     if (l.doc_id) d.slips.add(l.doc_id);
 
-    const sKey = l.section || '—';
-    const s = d.sections.get(sKey) || { section: l.section, assets: 0, units: 0, value: 0 };
-    if (l.kind === 'asset') s.assets++; else s.units += l.qty;
-    s.value += l.value;
-    d.sections.set(sKey, s);
+    const rKey = l.person_id ?? 'none';
+    const rc = d.recipients.get(rKey) || { person_id: l.person_id, person_name: l.person_name, assets: 0, units: 0, value: 0 };
+    if (l.kind === 'asset') rc.assets++; else rc.units += l.qty;
+    rc.value += l.value;
+    d.recipients.set(rKey, rc);
 
     const iKey = l.kind === 'asset' ? `${l.category_name}|${l.name}` : l.code;
     const it = d.items.get(iKey) || { kind: l.kind, code: l.kind === 'asset' ? null : l.code, name: l.name, category_name: l.category_name, unit: l.unit, qty: 0, value: 0 };
@@ -81,7 +81,7 @@ function summarize(lines) {
     ...d,
     people: d.people.size,
     slips: d.slips.size,
-    sections: [...d.sections.values()].sort((a, b) => b.value - a.value),
+    recipients: [...d.recipients.values()].sort((a, b) => b.value - a.value),
     items: [...d.items.values()].sort((a, b) => b.value - a.value || b.qty - a.qty),
   })).sort((a, b) => b.value - a.value);
   return { rows, totals };
@@ -108,18 +108,18 @@ r.get('/issues-by-department/export', requirePerm('report.view'), requirePerm('r
     s1.columns.forEach((c, i) => { c.width = i === 0 ? 26 : 16; });
     s1.getColumn(5).numFmt = '#,##0.00';
 
-    const s2 = wb.addWorksheet('แยกตาม Section');
-    s2.addRow(['แผนก', 'Section', 'รายชิ้น (ชิ้น)', 'นับจำนวน (หน่วย)', 'มูลค่า (บาท)']).font = { bold: true };
-    rows.forEach((d) => d.sections.forEach((s) => s2.addRow([d.department_name, s.section || '—', s.assets, s.units, s.value])));
+    const s2 = wb.addWorksheet('แยกตามผู้รับ');
+    s2.addRow(['แผนก', 'ผู้รับ', 'รายชิ้น (ชิ้น)', 'นับจำนวน (หน่วย)', 'มูลค่า (บาท)']).font = { bold: true };
+    rows.forEach((d) => d.recipients.forEach((x) => s2.addRow([d.department_name, x.person_name || '(ในนามแผนก)', x.assets, x.units, x.value])));
     s2.columns.forEach((c, i) => { c.width = i < 2 ? 24 : 16; });
     s2.getColumn(5).numFmt = '#,##0.00';
 
     const s3 = wb.addWorksheet('รายละเอียด');
-    s3.addRow(['วันที่', 'แผนก', 'Section', 'ผู้รับ', 'ประเภท', 'รหัส', 'รายการ', 'หมวดหมู่', 'จำนวน', 'หน่วย', 'มูลค่า (บาท)']).font = { bold: true };
-    lines.forEach((l) => s3.addRow([l.eff_date, l.department_name || 'ไม่ระบุแผนก', l.section || '', l.person_name || '',
+    s3.addRow(['วันที่', 'แผนก', 'ผู้รับ', 'ประเภท', 'รหัส', 'รายการ', 'หมวดหมู่', 'จำนวน', 'หน่วย', 'มูลค่า (บาท)']).font = { bold: true };
+    lines.forEach((l) => s3.addRow([l.eff_date, l.department_name || 'ไม่ระบุแผนก', l.person_name || '',
       l.kind === 'consumable' ? 'เบิก (นับจำนวน)' : l.mode === 'borrow' ? 'ยืม' : 'เบิกถาวร', l.code, l.name, l.category_name, l.qty, l.unit, l.value]));
-    s3.columns.forEach((c, i) => { c.width = [12, 20, 18, 22, 16, 16, 30, 16, 8, 8, 14][i]; });
-    s3.getColumn(11).numFmt = '#,##0.00';
+    s3.columns.forEach((c, i) => { c.width = [12, 22, 22, 16, 16, 30, 16, 8, 8, 14][i]; });
+    s3.getColumn(10).numFmt = '#,##0.00';
 
     audit(req, 'report', null, 'export', null, { report: 'issues-by-department', filter: req.query, lines: lines.length });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

@@ -10,7 +10,7 @@ r.get('/', requirePerm('dashboard.view'), (req, res) => {
   const total = Object.entries(counts).filter(([s]) => s !== 'scrapped').reduce((a, [, n]) => a + n, 0);
 
   const overdue = all(`
-    SELECT a.id, a.asset_tag, a.name, a.due_date, p.name holder_name, a.holder_section, d.name department_name
+    SELECT a.id, a.asset_tag, a.name, a.due_date, p.name holder_name, d.name department_name
     FROM assets a LEFT JOIN people p ON p.id = a.holder_person_id LEFT JOIN departments d ON d.id = a.department_id
     WHERE a.deleted_at IS NULL AND a.status = 'borrowed' AND a.due_date < date('now','localtime')
     ORDER BY a.due_date LIMIT 50`);

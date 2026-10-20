@@ -8,10 +8,10 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --no-warnings=ExperimentalWarning --watch-path=server server/index.js",
+    "dev": "node --no-warnings=ExperimentalWarning --watch-path=server server/index.js",
     "build": "vite build",
-    "start": "node --env-file-if-exists=.env --no-warnings=ExperimentalWarning server/index.js --prod",
-    "seed": "node --env-file-if-exists=.env --no-warnings=ExperimentalWarning server/seed.js"
+    "start": "node --no-warnings=ExperimentalWarning server/index.js --prod",
+    "seed": "node --no-warnings=ExperimentalWarning server/seed.js"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

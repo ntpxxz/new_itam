@@ -21,7 +21,7 @@ function where(q) {
   const w = ['1=1'];
   const p = [];
   if (q.action) { w.push('t.action = ?'); p.push(q.action); }
-  if (q.q) { w.push(`(a.asset_tag LIKE ? ESCAPE '\\' OR a.name LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR t.section LIKE ? ESCAPE '\\')`); p.push(likeTerm(q.q), likeTerm(q.q), likeTerm(q.q), likeTerm(q.q)); }
+  if (q.q) { w.push(`(a.asset_tag LIKE ? ESCAPE '\\' OR a.name LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR d.name LIKE ? ESCAPE '\\')`); p.push(likeTerm(q.q), likeTerm(q.q), likeTerm(q.q), likeTerm(q.q)); }
   if (q.from) { w.push('t.created_at >= ?'); p.push(q.from); }
   if (q.to) { w.push(`t.created_at < date(?, '+1 day')`); p.push(q.to); }
   return { sql: w.join(' AND '), p };
@@ -44,7 +44,7 @@ r.get('/export', requirePerm('report.export'), async (req, res, next) => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('ประวัติอุปกรณ์');
     ws.columns = [['วันเวลา (UTC)', 'created_at', 20], ['รหัสทรัพย์สิน', 'asset_tag', 16], ['อุปกรณ์', 'asset_name', 26], ['รายการ', 'action_label', 14],
-      ['พนักงาน', 'person_name', 20], ['Section', 'section', 16], ['แผนก', 'department_name', 16], ['สถานที่', 'location_name', 16], ['กำหนดคืน', 'due_date', 12],
+      ['พนักงาน', 'person_name', 20], ['แผนก', 'department_name', 16], ['สถานที่', 'location_name', 16], ['กำหนดคืน', 'due_date', 12],
       ['หมายเหตุ', 'note', 30], ['ผู้ทำรายการ', 'performed_by_name', 18]].map(([header, key, width]) => ({ header, key, width }));
     ws.getRow(1).font = { bold: true };
     rows.forEach((row) => ws.addRow({ ...row, action_label: row.action === 'receive' ? 'รับเข้า' : ACTIONS[row.action]?.label || row.action }));

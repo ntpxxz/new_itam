@@ -53,7 +53,10 @@ export function relative(v) {
   return fmtDate(v);
 }
 
-// Recipient label: name and/or section (name is optional)
-export const who = (name, section) => [name, section].filter(Boolean).join(' · ');
+// Recipient label: the person, or the department when issued to a department without a name
+export const who = (name, department) => name || department || '';
+
+// Asset is with someone (a person, or a department as a whole)
+export const isHeld = (a) => a.status === 'borrowed' || a.status === 'issued';
 
 export const initials =(name = '') => name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();

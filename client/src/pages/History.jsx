@@ -6,7 +6,7 @@ import { useAuth } from '../auth.jsx';
 import { download } from '../api.js';
 import { PageHeader, Pagination, Empty, Loading, Select, StatusChip } from '../components/ui.jsx';
 import { ACTION_META, ActionIcon } from '../components/actions.jsx';
-import { fmtDateTime, fmtDate, who } from '../format.js';
+import { fmtDateTime, fmtDate } from '../format.js';
 
 export default function HistoryPage() {
   const { can } = useAuth();
@@ -52,8 +52,8 @@ export default function HistoryPage() {
                       <td><Link to={`/assets/${t.asset_id}`} className="cell-main">{t.asset_name}</Link><div className="tag">{t.asset_tag}</div></td>
                       <td className="nowrap">{t.to_status ? <StatusChip status={t.to_status} /> : '—'}</td>
                       <td>
-                        {t.person_name || t.section || t.department_name || t.location_name ? (
-                          <>{(t.person_name || t.section) && <div>{who(t.person_name, t.section)}</div>}<div className="cell-sub">{[t.department_name, t.location_name].filter(Boolean).join(' · ')}</div></>
+                        {t.person_name || t.department_name || t.location_name ? (
+                          <>{t.person_name && <div>{t.person_name}</div>}<div className={t.person_name ? 'cell-sub' : undefined}>{[t.department_name, t.location_name].filter(Boolean).join(' · ')}</div></>
                         ) : <span className="subtle">—</span>}
                         {t.due_date && <div className="cell-sub">คืน {fmtDate(t.due_date)}</div>}
                       </td>

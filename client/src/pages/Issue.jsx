@@ -52,7 +52,7 @@ export default function Issue() {
 
   const submit = async () => {
     const e = {};
-    if (!hasRecipient(who)) e.recipient = 'กรอกชื่อผู้รับ หรือ Section อย่างน้อยหนึ่งอย่าง';
+    if (!hasRecipient(who)) e.recipient = 'กรอกชื่อผู้รับ หรือแผนก อย่างน้อยหนึ่งอย่าง';
     if (!head.doc_date) e.doc_date = 'กรุณาระบุวันที่เบิก';
     else if (head.doc_date > todayISO()) e.doc_date = 'วันที่เบิกต้องไม่เป็นวันในอนาคต';
     if (head.mode === 'borrow' && (!head.due_date || head.due_date < head.doc_date)) e.due_date = 'วันกำหนดคืนต้องไม่ก่อนวันที่เบิก';

@@ -8,7 +8,7 @@ import { useToast } from '../components/Toast.jsx';
 import { PageHeader, Card, StatusChip, Loading, Empty, Confirm, Menu } from '../components/ui.jsx';
 import ActionDialog from '../components/ActionDialog.jsx';
 import { ACTION_META } from '../components/actions.jsx';
-import { fmtDate, fmtDateTime, fmtMoney, daysFromToday, initials, fmtISODate, who } from '../format.js';
+import { fmtDate, fmtDateTime, fmtMoney, daysFromToday, initials, fmtISODate, who, isHeld } from '../format.js';
 
 const PRIMARY = { available: 'borrow', borrowed: 'return', issued: 'return', repair: 'repair_in', pending_disposal: 'scrap' };
 const TONE_NODE = { success: 'success', brand: 'brand', warning: 'warning', danger: 'danger', neutral: '' };
@@ -129,7 +129,7 @@ export default function AssetDetail() {
                       <span className={`node ${TONE_NODE[m.tone]}`} aria-hidden />
                       <div className="t-head">
                         <span className="t-title">{m.label}</span>
-                        {(h.person_name || h.section) && <span className="muted" style={{ fontSize: 13 }}>{['return', 'repair_in'].includes(h.action) ? 'จาก' : '→'} {who(h.person_name, h.section)}</span>}
+                        {h.person_name && <span className="muted" style={{ fontSize: 13 }}>{['return', 'repair_in'].includes(h.action) ? 'จาก' : '→'} {h.person_name}</span>}
                         <span className="t-meta">{h.doc_date && h.doc_date !== fmtISODate(h.created_at) ? <>วันที่ {fmtDate(h.doc_date)} · บันทึก {fmtDateTime(h.created_at)}</> : fmtDateTime(h.created_at)}</span>
                       </div>
                       <div className="t-body">
@@ -154,13 +154,12 @@ export default function AssetDetail() {
         <div className="stack">
           <Card title="สถานะปัจจุบัน">
             <div className="stack" style={{ gap: 12 }}>
-              {a.holder_name || a.holder_section ? (
+              {a.holder_name || (isHeld(a) && a.department_name) ? (
                 <div className="holder">
-                  <span className="avatar" aria-hidden>{initials(a.holder_name || a.holder_section)}</span>
+                  <span className="avatar" aria-hidden>{initials(who(a.holder_name, a.department_name))}</span>
                   <div style={{ minWidth: 0 }}>
-                    <div className="cell-main">{a.holder_name || a.holder_section}</div>
-                    {a.holder_name && a.holder_section && <div className="cell-sub">Section {a.holder_section}</div>}
-                    <div className="cell-sub">{[a.holder_code, a.department_name].filter(Boolean).join(' · ')}</div>
+                    <div className="cell-main">{who(a.holder_name, a.department_name)}</div>
+                    <div className="cell-sub">{a.holder_name ? [a.holder_code, a.department_name].filter(Boolean).join(' · ') : 'ทั้งแผนก (ไม่ระบุชื่อ)'}</div>
                   </div>
                 </div>
               ) : (

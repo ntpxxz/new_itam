@@ -34,14 +34,6 @@ function validate(table, body) {
 
 const r = Router();
 
-// Distinct sections already used, for autocomplete (sections are free text, not a lookup table).
-r.get('/sections', requireAuth, (req, res) => {
-  res.json({ rows: all(`SELECT name FROM (
-      SELECT section AS name FROM documents UNION SELECT section FROM asset_transactions
-      UNION SELECT section FROM stock_movements UNION SELECT holder_section FROM assets
-    ) WHERE name IS NOT NULL AND name <> '' ORDER BY name COLLATE NOCASE LIMIT 500`).map((x) => x.name) });
-});
-
 r.get('/:table', requireAuth, (req, res) => {
   const { table } = req.params;
   if (!TABLES[table]) throw notFound('ตาราง');

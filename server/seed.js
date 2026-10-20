@@ -1,10 +1,11 @@
 // Wipes data/itam.db and fills it with realistic demo data.
+import './env.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
-for (const f of ['itam.db', 'itam.db-wal', 'itam.db-shm']) fs.rmSync(path.join(dataDir, f), { force: true });
+const dbFile = process.env.DB_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'itam.db');
+for (const f of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) fs.rmSync(f, { force: true });
 
 const { run, get, tx } = await import('./db.js');
 const { bootstrap, roleId } = await import('./bootstrap.js');
@@ -71,17 +72,12 @@ tx(() => {
     [6, 'โปรเจกเตอร์ Epson EB-X51', 'Epson', 'EB-X51', '3800 lumens XGA', 15990, 2],
   ];
 
-  // Sections per department (free text in the app; seeded for a realistic report)
-  const SECTIONS = {
-    [depts[0]]: ['Infrastructure', 'Helpdesk'], [depts[1]]: ['บัญชีเจ้าหนี้', 'การเงิน'], [depts[2]]: ['ขายภาคเหนือ', 'ขายภาคใต้', 'Key Account'],
-    [depts[3]]: ['สรรหา', 'ฝึกอบรม'], [depts[4]]: ['Digital', 'Event'], [depts[5]]: ['Inbound', 'Outbound', 'คลังสินค้า'],
-  };
   const counters = {};
   const assetIds = [];
   const atx = (assetId, action, from, to, extra, when) => run(
-    `INSERT INTO asset_transactions (asset_id, action, from_status, to_status, person_id, section, department_id, location_id, due_date, note, cost, performed_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    assetId, action, from, to, extra.person_id, extra.section, extra.department_id, extra.location_id, extra.due_date, extra.note, extra.cost, pick(actors), ts(when));
+    `INSERT INTO asset_transactions (asset_id, action, from_status, to_status, person_id, department_id, location_id, due_date, note, cost, performed_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    assetId, action, from, to, extra.person_id, extra.department_id, extra.location_id, extra.due_date, extra.note, extra.cost, pick(actors), ts(when));
 
   for (const [ci, name, brand, model, specs, price, qty] of models) {
     for (let k = 0; k < qty; k++) {
@@ -108,22 +104,22 @@ tx(() => {
   // Give assets a lifecycle
   for (const a of assetIds) {
     const roll = rand();
-    const p = pick(people);
-    const dept = get('SELECT department_id FROM people WHERE id = ?', p).department_id;
-    const section = rand() < 0.6 ? pick(SECTIONS[dept] || ['ทั่วไป']) : null;
+    const someone = pick(people);
+    const dept = get('SELECT department_id FROM people WHERE id = ?', someone).department_id;
+    const p = rand() < 0.15 ? null : someone; // some items go to the department as a whole, no named person
     const start = addDays(a.bought, 3);
     const set = (fields) => run(`UPDATE assets SET ${Object.keys(fields).map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`, ...Object.values(fields), ts(new Date()), a.id);
 
     if (a.ci === 4) continue; // network gear stays in server room
     if (roll < 0.42) {
-      set({ status: 'issued', holder_person_id: p, holder_section: section, department_id: dept });
-      atx(a.id, 'issue', 'available', 'issued', { person_id: p, section, department_id: dept, note: 'เบิกใช้งานประจำ' }, start);
+      set({ status: 'issued', holder_person_id: p, department_id: dept });
+      atx(a.id, 'issue', 'available', 'issued', { person_id: p, department_id: dept, note: 'เบิกใช้งานประจำ' }, start);
     } else if (roll < 0.62) {
       // borrowed — some overdue
       const when = daysAgo(Math.floor(rand() * 20) + 1);
       const due = addDays(when, Math.floor(rand() * 14) + 2);
-      set({ status: 'borrowed', holder_person_id: p, holder_section: section, department_id: dept, due_date: iso(due) });
-      atx(a.id, 'borrow', 'available', 'borrowed', { person_id: p, section, department_id: dept, due_date: iso(due), note: pick(['ใช้นำเสนองานลูกค้า', 'ใช้ระหว่างเครื่องหลักส่งซ่อม', 'อบรมพนักงานใหม่', 'ออกงานนอกสถานที่']) }, when);
+      set({ status: 'borrowed', holder_person_id: someone, department_id: dept, due_date: iso(due) });
+      atx(a.id, 'borrow', 'available', 'borrowed', { person_id: someone, department_id: dept, due_date: iso(due), note: pick(['ใช้นำเสนองานลูกค้า', 'ใช้ระหว่างเครื่องหลักส่งซ่อม', 'อบรมพนักงานใหม่', 'ออกงานนอกสถานที่']) }, when);
     } else if (roll < 0.69) {
       const when = daysAgo(Math.floor(rand() * 10) + 1);
       set({ status: 'repair' });
@@ -141,8 +137,8 @@ tx(() => {
     } else if (roll < 0.86) {
       // had a past borrow, returned
       const when = daysAgo(Math.floor(rand() * 60) + 20);
-      atx(a.id, 'borrow', 'available', 'borrowed', { person_id: p, department_id: dept, due_date: iso(addDays(when, 7)), note: 'ยืมใช้ชั่วคราว' }, when);
-      atx(a.id, 'return', 'borrowed', 'available', { person_id: p, note: 'คืนสภาพดี' }, addDays(when, 6));
+      atx(a.id, 'borrow', 'available', 'borrowed', { person_id: someone, department_id: dept, due_date: iso(addDays(when, 7)), note: 'ยืมใช้ชั่วคราว' }, when);
+      atx(a.id, 'return', 'borrowed', 'available', { person_id: someone, note: 'คืนสภาพดี' }, addDays(when, 6));
     }
   }
 
@@ -178,9 +174,9 @@ tx(() => {
       const p = pick(people);
       bal -= q;
       const pd = get('SELECT department_id FROM people WHERE id = ?', p).department_id;
-      run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, person_id, department_id, section, note, performed_by, created_at)
-        VALUES (?, 'out', ?, ?, ?, ?, ?, ?, ?, ?)`,
-        id, q, bal, p, pd, rand() < 0.6 ? pick(SECTIONS[pd]) : null, pick(['ของเดิมชำรุด', 'พนักงานใหม่', 'ใช้ห้องประชุม', '']), pick(actors), ts(daysAgo(m)));
+      run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, person_id, department_id, note, performed_by, created_at)
+        VALUES (?, 'out', ?, ?, ?, ?, ?, ?, ?)`,
+        id, q, bal, rand() < 0.2 ? null : p, pd, pick(['ของเดิมชำรุด', 'พนักงานใหม่', 'ใช้ห้องประชุม', '']), pick(actors), ts(daysAgo(m)));
     }
     if (bal !== finalQty) {
       run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, note, performed_by, created_at) VALUES (?, 'adjust', ?, ?, ?, ?, ?)`,

@@ -16,7 +16,7 @@ const STOCK_STATUS = ['in_stock', 'low_stock', 'out_of_stock'];
 
 const ASSET_PART = `
   SELECT 'asset' AS kind, a.id, a.asset_tag AS code, a.name, a.category_id, c.name AS category_name, a.status,
-         a.image_path, a.serial_no, a.brand, a.model, p.name AS holder_name, a.holder_section, d.name AS department_name, a.location_id, l.name AS location_name,
+         a.image_path, a.serial_no, a.brand, a.model, p.name AS holder_name, d.name AS department_name, a.location_id, l.name AS location_name,
          a.due_date, a.warranty_expiry, a.purchase_price AS price, NULL AS qty_on_hand, NULL AS unit, NULL AS reorder_point,
          a.updated_at
   FROM assets a JOIN categories c ON c.id = a.category_id
@@ -27,7 +27,7 @@ const ASSET_PART = `
 const CONS_PART = `
   SELECT 'consumable' AS kind, x.id, x.sku AS code, x.name, x.category_id, c.name AS category_name,
          CASE WHEN x.qty_on_hand = 0 THEN 'out_of_stock' WHEN x.qty_on_hand <= x.reorder_point THEN 'low_stock' ELSE 'in_stock' END AS status,
-         NULL AS image_path, NULL AS serial_no, NULL AS brand, NULL AS model, NULL AS holder_name, NULL AS holder_section, NULL AS department_name, x.location_id, l.name AS location_name,
+         NULL AS image_path, NULL AS serial_no, NULL AS brand, NULL AS model, NULL AS holder_name, NULL AS department_name, x.location_id, l.name AS location_name,
          NULL AS due_date, NULL AS warranty_expiry, x.unit_cost AS price, x.qty_on_hand, x.unit, x.reorder_point,
          x.updated_at
   FROM consumables x JOIN categories c ON c.id = x.category_id
@@ -48,7 +48,7 @@ function build(req) {
   const where = ['1=1'];
   const params = [];
   if (q.q) {
-    where.push(`(code LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\' OR serial_no LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\' OR model LIKE ? ESCAPE '\\' OR holder_name LIKE ? ESCAPE '\\' OR holder_section LIKE ? ESCAPE '\\')`);
+    where.push(`(code LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\' OR serial_no LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\' OR model LIKE ? ESCAPE '\\' OR holder_name LIKE ? ESCAPE '\\' OR department_name LIKE ? ESCAPE '\\')`);
     params.push(...Array(7).fill(likeTerm(q.q)));
   }
   if (q.category_id) { where.push('category_id = ?'); params.push(q.category_id); }

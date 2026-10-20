@@ -11,7 +11,7 @@ import {
   PageHeader, StatusChip, Pagination, Empty, Loading, Menu, Select, SortHeader, Confirm, CategorySelect, STATUS, KIND_LABEL,
 } from '../components/ui.jsx';
 import { MoveDialog } from '../components/ConsumableDialogs.jsx';
-import { fmtDate, daysFromToday, fmtMoney, fmtNum, who } from '../format.js';
+import { fmtDate, daysFromToday, fmtMoney, fmtNum, who, isHeld } from '../format.js';
 
 const FILTERS = [
   ['available', STATUS.available], ['borrowed', STATUS.borrowed], ['issued', STATUS.issued], ['repair', STATUS.repair],
@@ -186,7 +186,9 @@ function AssetRow({ r, can, selected, onToggle, onOpen, onDelete }) {
         {overdue && <div className="cell-sub danger-text" style={{ marginTop: 4 }}>เกินกำหนด {Math.abs(daysFromToday(r.due_date))} วัน</div>}
       </td>
       <td>
-        {r.holder_name || r.holder_section ? <><div>{who(r.holder_name, r.holder_section)}</div><div className="cell-sub">{r.department_name}</div></> : <span className="muted">{r.location_name || '—'}</span>}
+        {r.holder_name || (isHeld(r) && r.department_name)
+          ? <><div>{who(r.holder_name, r.department_name)}</div><div className="cell-sub">{r.holder_name ? r.department_name : 'ทั้งแผนก'}</div></>
+          : <span className="muted">{r.location_name || '—'}</span>}
       </td>
       <td className="nowrap">
         {r.warranty_expiry ? <span className={wd < 0 ? 'subtle' : wd <= 30 ? 'danger-text' : ''}>{fmtDate(r.warranty_expiry)}</span> : <span className="subtle">—</span>}

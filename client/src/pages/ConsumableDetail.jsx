@@ -71,7 +71,7 @@ export default function ConsumableDetail() {
                         <td><div className="row" style={{ gap: 8 }}><ActionIcon meta={meta} size={12} />{meta.label}</div></td>
                         <td className="text-right mono">{sign}{fmtNum(Math.abs(m.qty))}</td>
                         <td className="text-right mono">{fmtNum(m.balance_after)}</td>
-                        <td>{(m.person_name || m.section || m.department_name) && <div>{who(m.person_name, m.section) || '—'}<span className="cell-sub"> · {m.department_name || 'ไม่ระบุแผนก'}</span></div>}{m.note && <div className="cell-sub">{m.note}</div>}{m.doc_no && <Link to={`/documents/${m.doc_id}`} className="mono" style={{ fontSize: 12 }}>{m.doc_no}</Link>}</td>
+                        <td>{(m.person_name || m.department_name) && <div>{who(m.person_name, m.department_name)}{m.person_name && <span className="cell-sub"> · {m.department_name || 'ไม่ระบุแผนก'}</span>}</div>}{m.note && <div className="cell-sub">{m.note}</div>}{m.doc_no && <Link to={`/documents/${m.doc_id}`} className="mono" style={{ fontSize: 12 }}>{m.doc_no}</Link>}</td>
                         <td className="muted">{m.performed_by_name}</td>
                       </tr>
                     );

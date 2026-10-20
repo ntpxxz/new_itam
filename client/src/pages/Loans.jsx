@@ -57,7 +57,7 @@ export default function Loans() {
                   return (
                     <tr key={a.id}>
                       <td><Link to={`/assets/${a.id}`} className="cell-main">{a.name}</Link><div className="tag">{a.asset_tag}</div></td>
-                      <td>{who(a.holder_name, a.holder_section) || '—'}<div className="cell-sub">{a.department_name}</div></td>
+                      <td>{who(a.holder_name, a.department_name) || '—'}<div className="cell-sub">{a.holder_name ? a.department_name : 'ทั้งแผนก'}</div></td>
                       <td><StatusChip status={a.status} /></td>
                       <td className="nowrap">
                         {a.status === 'borrowed' ? (

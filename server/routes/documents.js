@@ -97,11 +97,11 @@ r.post('/issue', requirePerm('asset.transact', 'consumable.move'), (req, res) =>
   if (mode === 'borrow' && lines.some((l) => l.kind === 'consumable')) throw bad('รายการนับจำนวนเป็นของสิ้นเปลือง ยืมไม่ได้ — ใช้ประเภท “เบิกออก”');
 
   const result = tx(() => {
-    const { person_id, department_id, section } = resolveRecipient(req, b);
-    const who = { person_id, department_id, section };
+    const who = resolveRecipient(req, b);
+    const { person_id, department_id } = who;
     const doc_no = nextDocNo('issue', doc_date);
-    const docId = Number(run(`INSERT INTO documents (doc_no, type, doc_date, mode, person_id, department_id, section, location_id, due_date, note, created_by)
-      VALUES (?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?, ?)`, doc_no, doc_date, mode, person_id, department_id, section, toInt(b.location_id), due_date, b.note, req.user.id).lastInsertRowid);
+    const docId = Number(run(`INSERT INTO documents (doc_no, type, doc_date, mode, person_id, department_id, location_id, due_date, note, created_by)
+      VALUES (?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?)`, doc_no, doc_date, mode, person_id, department_id, toInt(b.location_id), due_date, b.note, req.user.id).lastInsertRowid);
     let assets = 0;
     let units = 0;
     lines.forEach((l, i) => {
@@ -117,7 +117,7 @@ r.post('/issue', requirePerm('asset.transact', 'consumable.move'), (req, res) =>
         } else throw bad('ประเภทรายการไม่ถูกต้อง');
       } catch (e) { throw lineError(i, e); }
     });
-    audit(req, 'document', docId, 'issue', null, { doc_no, mode, person_id, section, lines: lines.length, assets, units });
+    audit(req, 'document', docId, 'issue', null, { doc_no, mode, person_id, department_id, lines: lines.length, assets, units });
     return { id: docId, doc_no, assets, units };
   });
   res.status(201).json(result);
@@ -140,8 +140,8 @@ r.get('/', requirePerm('asset.view', 'consumable.view'), (req, res) => {
   const { page, pageSize, offset } = paging(req);
   const w = ['1=1']; const p = [];
   if (req.query.type) { w.push('d.type = ?'); p.push(req.query.type); }
-  if (req.query.q) { w.push(`(d.doc_no LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR d.section LIKE ? ESCAPE '\\' OR d.po_number LIKE ? ESCAPE '\\')`); p.push(likeTerm(req.query.q), likeTerm(req.query.q), likeTerm(req.query.q), likeTerm(req.query.q)); }
-  const total = get(`SELECT COUNT(*) n FROM documents d LEFT JOIN people p ON p.id = d.person_id WHERE ${w.join(' AND ')}`, ...p).n;
+  if (req.query.q) { w.push(`(d.doc_no LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR dp.name LIKE ? ESCAPE '\\' OR d.po_number LIKE ? ESCAPE '\\')`); p.push(likeTerm(req.query.q), likeTerm(req.query.q), likeTerm(req.query.q), likeTerm(req.query.q)); }
+  const total = get(`SELECT COUNT(*) n FROM documents d LEFT JOIN people p ON p.id = d.person_id LEFT JOIN departments dp ON dp.id = d.department_id WHERE ${w.join(' AND ')}`, ...p).n;
   const rows = all(`${DOC_SELECT} WHERE ${w.join(' AND ')} ORDER BY d.id DESC LIMIT ? OFFSET ?`, ...p, pageSize, offset);
   res.json({ rows, total, page, pageSize });
 });

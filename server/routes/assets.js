@@ -74,7 +74,7 @@ function buildFilter(q) {
   const where = ['a.deleted_at IS NULL'];
   const params = [];
   if (q.q) {
-    where.push(`(a.asset_tag LIKE ? ESCAPE '\\' OR a.name LIKE ? ESCAPE '\\' OR a.serial_no LIKE ? ESCAPE '\\' OR a.brand LIKE ? ESCAPE '\\' OR a.model LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR a.holder_section LIKE ? ESCAPE '\\')`);
+    where.push(`(a.asset_tag LIKE ? ESCAPE '\\' OR a.name LIKE ? ESCAPE '\\' OR a.serial_no LIKE ? ESCAPE '\\' OR a.brand LIKE ? ESCAPE '\\' OR a.model LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR d.name LIKE ? ESCAPE '\\')`);
     params.push(...Array(7).fill(likeTerm(q.q)));
   }
   if (q.status) {
@@ -128,7 +128,7 @@ export function addAssetSheet(wb, rows) {
     const ws = wb.addWorksheet('อุปกรณ์รายชิ้น');
     ws.columns = [
       ['รหัสทรัพย์สิน', 'asset_tag', 18], ['ชื่อ', 'name', 28], ['หมวดหมู่', 'category_name', 16], ['ยี่ห้อ', 'brand', 14],
-      ['รุ่น', 'model', 18], ['Serial Number', 'serial_no', 20], ['สถานะ', 'status_label', 12], ['ผู้ถือครอง', 'holder_name', 20], ['Section', 'holder_section', 16],
+      ['รุ่น', 'model', 18], ['Serial Number', 'serial_no', 20], ['สถานะ', 'status_label', 12], ['ผู้ถือครอง', 'holder_name', 20],
       ['แผนก', 'department_name', 16], ['สถานที่', 'location_name', 18], ['กำหนดคืน', 'due_date', 12], ['วันที่ซื้อ', 'purchase_date', 12],
       ['ราคา', 'purchase_price', 12], ['PO', 'po_number', 14], ['ใบแจ้งหนี้', 'invoice_number', 14], ['ผู้ขาย', 'vendor_name', 18],
       ['หมดประกัน', 'warranty_expiry', 12], ['วันที่รับเข้า', 'received_date', 12], ['สเปก', 'specs', 30], ['หมายเหตุ', 'notes', 24],
@@ -300,8 +300,8 @@ export function applyAction(req, assetId, action, input, docId = null) {
   const b = input || {};
   const recipient = ['borrow', 'issue', 'transfer'].includes(action)
     ? resolveRecipient(req, b, { required: def.needs.includes('recipient') })
-    : { person_id: toInt(b.person_id), department_id: toInt(b.department_id), section: null };
-  const { person_id, department_id, section } = recipient;
+    : { person_id: toInt(b.person_id), department_id: toInt(b.department_id) };
+  const { person_id, department_id } = recipient;
   const location_id = toInt(b.location_id);
   const note = (b.note || '').trim();
   const due_date = b.due_date || null;
@@ -314,7 +314,7 @@ export function applyAction(req, assetId, action, input, docId = null) {
   }
   if (def.needs.includes('note') && !note) throw bad(action === 'scrap' ? 'กรุณาระบุเหตุผลการ Scrap' : 'กรุณาระบุรายละเอียด/สาเหตุ');
   if (def.needs.includes('evidence') && !evidence) throw bad('กรุณาแนบหลักฐานการ Scrap (รูปภาพหรือ PDF) เช่น ใบอนุมัติจำหน่าย');
-  if (action === 'transfer' && !person_id && !department_id && !location_id && !section) throw bad('กรุณาระบุปลายทางที่จะโอนย้าย (ผู้ถือครอง, Section, แผนก หรือสถานที่)');
+  if (action === 'transfer' && !person_id && !department_id && !location_id) throw bad('กรุณาระบุปลายทางที่จะโอนย้าย (ผู้ถือครอง, แผนก หรือสถานที่)');
   if (person_id && !get('SELECT 1 FROM people WHERE id = ? AND deleted_at IS NULL', person_id)) throw bad('ไม่พบพนักงานที่เลือก');
 
   const patch = {};
@@ -324,7 +324,6 @@ export function applyAction(req, assetId, action, input, docId = null) {
     case 'borrow':
     case 'issue': {
       patch.holder_person_id = person_id;
-      patch.holder_section = section;
       patch.department_id = department_id ?? a.department_id;
       patch.due_date = action === 'borrow' ? due_date : null;
       if (location_id) patch.location_id = location_id;
@@ -333,15 +332,13 @@ export function applyAction(req, assetId, action, input, docId = null) {
     case 'return':
     case 'repair_in':
       patch.holder_person_id = null;
-      patch.holder_section = null;
       patch.due_date = null;
       if (location_id) patch.location_id = location_id;
       break;
     case 'transfer':
-      if (person_id || section) {
+      if (person_id) {
         if (a.status === 'available') throw bad('อุปกรณ์ในคลังโอนให้บุคคลไม่ได้ — ใช้ "ยืม" หรือ "เบิกถาวร" แทน');
         patch.holder_person_id = person_id;
-        patch.holder_section = section;
       }
       if (department_id) patch.department_id = department_id;
       if (location_id) patch.location_id = location_id;
@@ -355,10 +352,10 @@ export function applyAction(req, assetId, action, input, docId = null) {
     const keys = Object.keys(patch);
     run(`UPDATE assets SET ${keys.map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`, ...keys.map((k) => patch[k]), now(), a.id);
     const returning = ['return', 'repair_in'].includes(action);
-    run(`INSERT INTO asset_transactions (asset_id, action, from_status, to_status, person_id, section, department_id, location_id, due_date, note, evidence_path, cost, performed_by, doc_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    run(`INSERT INTO asset_transactions (asset_id, action, from_status, to_status, person_id, department_id, location_id, due_date, note, evidence_path, cost, performed_by, doc_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       a.id, action, a.status, to,
-      person_id ?? (returning ? a.holder_person_id : null), section ?? (returning ? a.holder_section : null),
+      person_id ?? (returning ? a.holder_person_id : null),
       patch.department_id ?? department_id, patch.location_id ?? location_id,
       patch.due_date ?? null, note, evidence, cost, req.user.id, docId);
     audit(req, 'asset', a.id, action, a, get('SELECT * FROM assets WHERE id = ?', a.id));

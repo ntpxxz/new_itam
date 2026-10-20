@@ -160,9 +160,9 @@ export function moveStock(req, consumableId, input, docId = null) {
   const { type, note } = input;
   const qty = toInt(input.qty);
   // Recipient is optional for a plain stock-out, but if given it is resolved the same way as for assets.
-  let { person_id, department_id, section } = type === 'out'
+  const { person_id, department_id } = type === 'out'
     ? resolveRecipient(req, input, { required: false })
-    : { person_id: null, department_id: null, section: null };
+    : { person_id: null, department_id: null };
   const unit_cost = toNum(input.unit_cost);
   if (!['in', 'out', 'adjust'].includes(type)) throw bad('ประเภทรายการไม่ถูกต้อง');
   if (qty === null || Number.isNaN(qty) || qty < 0 || (type !== 'adjust' && qty === 0)) throw bad('กรุณาระบุจำนวนที่มากกว่า 0');
@@ -183,8 +183,8 @@ export function moveStock(req, consumableId, input, docId = null) {
       moved = qty - item.qty_on_hand;
     }
     run('UPDATE consumables SET qty_on_hand = ?, updated_at = ? WHERE id = ?', balance, now(), item.id);
-    run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, person_id, department_id, section, unit_cost, received_date, note, performed_by, doc_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.id, type, moved, balance, person_id, department_id, section,
+    run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, person_id, department_id, unit_cost, received_date, note, performed_by, doc_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.id, type, moved, balance, person_id, department_id,
       unit_cost ?? (type === 'in' ? item.unit_cost : null), received, note, req.user.id, docId);
     audit(req, 'consumable', item.id, `stock_${type}`, { qty_on_hand: item.qty_on_hand }, { qty_on_hand: balance, qty: moved, note });
     return { balance, low: balance <= item.reorder_point };

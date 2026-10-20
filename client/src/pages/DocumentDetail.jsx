@@ -45,8 +45,7 @@ export default function DocumentDetail() {
             </>
           ) : (
             <>
-              <dt>ผู้รับ</dt><dd>{d.person_name || '—'}{d.emp_code && <span className="tag"> ({d.emp_code})</span>}</dd>
-              <dt>Section</dt><dd>{d.section || '—'}</dd>
+              <dt>ผู้รับ</dt><dd>{d.person_name || 'ทั้งแผนก (ไม่ระบุชื่อ)'}{d.emp_code && <span className="tag"> ({d.emp_code})</span>}</dd>
               <dt>แผนก</dt><dd>{d.department_name || '—'}</dd>
               <dt>ประเภท</dt><dd>{d.mode === 'borrow' ? <Chip tone="brand">ยืม (ต้องคืน)</Chip> : <Chip tone="brand" dot={false}>เบิกออก</Chip>}</dd>
             </>
@@ -85,7 +84,7 @@ export default function DocumentDetail() {
         </div>
 
         <div className="signatures">
-          <div><div className="sig-line" />{isReceive ? 'ผู้ส่งของ' : 'ผู้รับอุปกรณ์'}<div className="cell-sub">{isReceive ? d.vendor_name : who(d.person_name, d.section)}</div></div>
+          <div><div className="sig-line" />{isReceive ? 'ผู้ส่งของ' : 'ผู้รับอุปกรณ์'}<div className="cell-sub">{isReceive ? d.vendor_name : who(d.person_name, d.department_name)}</div></div>
           <div><div className="sig-line" />{isReceive ? 'ผู้รับเข้า' : 'ผู้จ่ายอุปกรณ์'}<div className="cell-sub">{d.created_by_name}</div></div>
           <div><div className="sig-line" />ผู้อนุมัติ<div className="cell-sub">&nbsp;</div></div>
         </div>
