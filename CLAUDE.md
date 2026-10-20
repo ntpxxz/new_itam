@@ -1,4 +1,4 @@
-# CLAUDE.md — AssetFlow (ITAM)
+# CLAUDE.md — IT Store (ITAM)
 
 ระบบจัดการทรัพย์สินไอที (IT Asset Management) เน้นอุปกรณ์รายชิ้น + วัสดุสิ้นเปลืองที่เบิกจ่ายบ่อย (เมาส์, USB, สาย LAN, ตลับหมึก)
 
@@ -115,7 +115,7 @@ available ──transfer──▶ available (location/department move)
 
 ### Data integrity
 - **Soft delete only** (`deleted_at`) for assets, consumables, people, users, master data. Never `DELETE` business rows.
-- Asset tags auto-generated: `<category.prefix>-<YYYY>-<00001>` (e.g. `NB-2026-00012`). Consumable SKU: `C-<prefix>-<0001>`.
+- Asset tags auto-generated: `<category.prefix>-<YYYY>-<00001>` (e.g. `NB-2026-00012`). Consumable SKU = the product's **barcode**, typed/scanned by the user (required, unique incl. soft-deleted, no spaces, ≤ 64 chars, editable) — never auto-generated. Scanning a SKU in รับเข้า/เบิกออก or `/scan` finds the consumable.
 - `audit_logs` and `access_logs` are append-only — SQLite triggers abort UPDATE, and abort DELETE unless the row is older than `settings.log_retention_days` (PDPA retention purge runs daily on boot/interval).
 
 ### Permissions

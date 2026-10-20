@@ -93,5 +93,5 @@ app.use((err, req, res, next) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  AssetFlow ITAM  ${PROD ? '(production)' : '(dev)'}  →  http://localhost:${PORT}\n`);
+  console.log(`\n  IT Store  ${PROD ? '(production)' : '(dev)'}  →  http://localhost:${PORT}\n`);
 });

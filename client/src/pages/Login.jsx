@@ -35,7 +35,7 @@ export default function Login() {
       <div className="login-art">
         <div className="row" style={{ gap: 10 }}>
           <span className="brand-mark" style={{ background: 'var(--bg-surface)', color: 'var(--brand)' }}><Boxes size={18} /></span>
-          <span style={{ fontWeight: 600, fontSize: 18 }}>AssetFlow</span>
+          <span style={{ fontWeight: 600, fontSize: 18 }}>IT Store</span>
         </div>
         <div>
           <h2>รู้ว่าอุปกรณ์ทุกชิ้นอยู่ที่ไหน อยู่กับใคร</h2>
@@ -46,7 +46,7 @@ export default function Login() {
             <div><ShieldCheck size={18} /> สิทธิ์การใช้งานแยกตามบทบาท</div>
           </div>
         </div>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>© {new Date().getFullYear()} AssetFlow · IT Asset Management</div>
+        <div style={{ fontSize: 12, opacity: 0.7 }}>© {new Date().getFullYear()} IT Store · IT Asset Management</div>
       </div>
 
       <div className="login-form-wrap">

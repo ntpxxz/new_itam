@@ -26,7 +26,7 @@ export default function DocumentDetail() {
       <Card className="doc-sheet">
         <div className="doc-head">
           <div>
-            <div className="l-org">AssetFlow · IT Asset Management</div>
+            <div className="l-org">IT Store · IT Asset Management</div>
             <h2 className="doc-title">{title}</h2>
           </div>
           <dl className="dl doc-meta">

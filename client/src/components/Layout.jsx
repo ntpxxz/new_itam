@@ -88,7 +88,7 @@ export default function Layout() {
         <Link to="/" className="brand" style={{ textDecoration: 'none', color: 'inherit' }}>
           <span className="brand-mark"><Boxes size={18} aria-hidden /></span>
           <span>
-            <div className="brand-name">AssetFlow</div>
+            <div className="brand-name">IT Store</div>
             <div className="brand-sub">ระบบจัดการทรัพย์สินไอที</div>
           </span>
         </Link>

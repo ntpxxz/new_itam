@@ -1,9 +1,9 @@
 {
-  "name": "assetflow-itam",
+  "name": "it-store-itam",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "AssetFlow — IT Asset Management",
+  "description": "IT Store — IT Asset Management",
   "engines": {
     "node": ">=22.13"
   },

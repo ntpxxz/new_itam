@@ -35,6 +35,6 @@ export const DEFAULT_SETTINGS = {
   session_idle_minutes: '30',
   log_retention_days: '730',
   warranty_alert_days: '30',
-  org_name: 'AssetFlow',
+  org_name: 'IT Store',
   public_base_url: '',
 };

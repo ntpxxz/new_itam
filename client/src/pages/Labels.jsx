@@ -62,7 +62,7 @@ export default function Labels() {
             <div className="label" key={a.id}>
               <img src={`/api/assets/${a.id}/qr?origin=${encodeURIComponent(origin)}`} alt={`QR ${a.asset_tag}`} />
               <div style={{ minWidth: 0 }}>
-                <div className="l-org">IT Asset · AssetFlow</div>
+                <div className="l-org">IT Store</div>
                 <div className="l-tag">{a.asset_tag}</div>
                 <div className="l-name">{a.name}</div>
                 {a.serial_no && <div className="l-name mono">SN {a.serial_no}</div>}
