@@ -85,3 +85,7 @@ data/               ฐานข้อมูลและไฟล์อัปโ
 - [`CLAUDE.md`](CLAUDE.md) — กฎของระบบ (domain rules), แนวทาง UI และ roadmap
 - [`it-asset-management-ideas.md`](it-asset-management-ideas.md) — ความต้องการของระบบ
 - [`UI-design.md`](UI-design.md) — design system
+
+## License
+
+[MIT](LICENSE)
