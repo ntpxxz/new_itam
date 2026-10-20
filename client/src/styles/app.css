@@ -209,6 +209,7 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
 .table tbody tr { transition: background-color 100ms linear; }
 .table tbody tr:hover { background: var(--bg-subtle); }
 .table tbody tr.clickable { cursor: pointer; }
+.table tbody tr[aria-selected='true'] { background: var(--brand-soft); }
 .table tbody tr:last-child td { border-bottom: 0; }
 .table td.actions, .table th.actions { text-align: right; width: 1%; white-space: nowrap; }
 .cell-main { font-weight: 500; color: var(--text); }
