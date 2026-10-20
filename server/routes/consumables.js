@@ -41,10 +41,16 @@ function checkReceived(d) {
   return d;
 }
 
-function nextSku(prefix) {
-  const base = `C-${prefix}-`;
-  const row = get('SELECT sku FROM consumables WHERE sku LIKE ? ORDER BY sku DESC LIMIT 1', base + '%');
-  return base + String(row ? parseInt(row.sku.slice(base.length), 10) + 1 : 1).padStart(4, '0');
+// SKU = the product's barcode, typed or scanned by the user (never generated).
+function checkSku(raw, selfId = null) {
+  const sku = String(raw ?? '').trim();
+  if (!sku) throw bad('กรุณากรอก SKU (บาร์โค้ดของสินค้า) หรือสแกนบาร์โค้ด');
+  if (sku.length > 64 || /\s/.test(sku)) throw bad('SKU ต้องไม่มีช่องว่าง และยาวไม่เกิน 64 ตัวอักษร');
+  const dup = get('SELECT id, name, deleted_at FROM consumables WHERE sku = ? COLLATE NOCASE AND id IS NOT ?', sku, selfId);
+  if (dup) throw bad(dup.deleted_at
+    ? `SKU ${sku} เคยใช้กับรายการที่ลบไปแล้ว (${dup.name}) — ใช้ SKU อื่น`
+    : `SKU ${sku} ซ้ำกับ "${dup.name}" — ตรวจสอบบาร์โค้ดแล้วลองใหม่`);
+  return sku;
 }
 
 function where(q) {
@@ -95,6 +101,13 @@ export function addConsumableSheets(wb, rows) {
       .forEach((row) => mv.addRow({ ...row, type: { in: 'รับเข้า', out: 'เบิก', adjust: 'ปรับยอด' }[row.type] }));
 }
 
+r.get('/by-sku/:sku', requirePerm('consumable.view'), (req, res) => {
+  const sku = String(req.params.sku).trim();
+  const x = get('SELECT id FROM consumables WHERE sku = ? COLLATE NOCASE AND deleted_at IS NULL', sku);
+  if (!x) throw notFound(`วัสดุ SKU ${sku}`);
+  res.json({ id: x.id });
+});
+
 r.get('/:id', requirePerm('consumable.view'), (req, res) => {
   const item = get(`${SELECT} WHERE x.id = ? AND x.deleted_at IS NULL`, req.params.id);
   if (!item) throw notFound('วัสดุ');
@@ -111,13 +124,14 @@ r.get('/:id', requirePerm('consumable.view'), (req, res) => {
 });
 
 r.post('/', requirePerm('consumable.manage'), (req, res) => {
-  const { v, cat } = normalize(req.body || {});
+  const { v } = normalize(req.body || {});
+  const sku = checkSku(req.body.sku);
   const initial = toInt(req.body.qty_on_hand) || 0;
   if (initial < 0) throw bad('จำนวนเริ่มต้นต้องไม่ติดลบ');
   const received = checkReceived(req.body.received_date);
   const id = tx(() => {
     const info = run(`INSERT INTO consumables (sku, ${FIELDS.join(',')}, qty_on_hand) VALUES (?, ${FIELDS.map(() => '?').join(',')}, ?)`,
-      nextSku(cat.prefix), ...FIELDS.map((f) => v[f]), initial);
+      sku, ...FIELDS.map((f) => v[f]), initial);
     const newId = Number(info.lastInsertRowid);
     if (initial > 0) {
       run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, unit_cost, received_date, note, performed_by) VALUES (?, 'in', ?, ?, ?, ?, 'ยอดยกมา', ?)`,
@@ -133,8 +147,9 @@ r.put('/:id', requirePerm('consumable.manage'), (req, res) => {
   const before = get('SELECT * FROM consumables WHERE id = ? AND deleted_at IS NULL', req.params.id);
   if (!before) throw notFound('วัสดุ');
   const { v } = normalize({ ...before, ...req.body });
+  const sku = req.body.sku === undefined ? before.sku : checkSku(req.body.sku, before.id);
   tx(() => {
-    run(`UPDATE consumables SET ${FIELDS.map((f) => `${f} = ?`).join(', ')}, updated_at = ? WHERE id = ?`, ...FIELDS.map((f) => v[f]), now(), before.id);
+    run(`UPDATE consumables SET sku = ?, ${FIELDS.map((f) => `${f} = ?`).join(', ')}, updated_at = ? WHERE id = ?`, sku, ...FIELDS.map((f) => v[f]), now(), before.id);
     audit(req, 'consumable', before.id, 'update', before, get('SELECT * FROM consumables WHERE id = ?', before.id));
   });
   res.json(get(`${SELECT} WHERE x.id = ?`, before.id));

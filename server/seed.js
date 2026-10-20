@@ -151,11 +151,10 @@ tx(() => {
     [3, 'แฟลชไดรฟ์ USB 32GB', 'ชิ้น', 18, 10, 189], [3, 'แฟลชไดรฟ์ USB 64GB', 'ชิ้น', 0, 5, 289],
     [4, 'แผ่นรองเมาส์', 'ชิ้น', 30, 10, 59], [4, 'หูฟัง USB Headset', 'ชิ้น', 9, 5, 590],
   ];
-  const skuCount = {};
+  // Demo barcodes (EAN-13 style); real SKUs are scanned from the product box.
+  let barcode = 8850000000010;
   for (const [ci, name, unit, finalQty, reorder, cost] of cons) {
-    const prefix = ['MSE', 'CBL', 'INK', 'USB', 'ACC'][ci];
-    skuCount[prefix] = (skuCount[prefix] || 0) + 1;
-    const sku = `C-${prefix}-${String(skuCount[prefix]).padStart(4, '0')}`;
+    const sku = String(barcode += 7);
     const id = Number(run(`INSERT INTO consumables (sku, category_id, name, unit, qty_on_hand, reorder_point, location_id, unit_cost, vendor_id)
       VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)`, sku, consCats[ci], name, unit, reorder, locs[0], cost, pick(vendors)).lastInsertRowid);
     // Build history backwards: several receipts and issues over 6 months, ending at finalQty.

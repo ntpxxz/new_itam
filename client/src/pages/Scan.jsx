@@ -36,6 +36,10 @@ export default function Scan() {
       setCode('');
     } catch (e) {
       setFound(null);
+      if (e.status === 404 && can('consumable.view')) {
+        const hit = await api.get(`/api/consumables/by-sku/${encodeURIComponent(tag)}`).catch(() => null);
+        if (hit) { navigate(`/consumables/${hit.id}`); return; }
+      }
       toast.error(e.status === 404 ? `ไม่พบอุปกรณ์รหัส "${tag}" — ตรวจสอบรหัสแล้วลองใหม่` : e);
     } finally { setBusy(false); }
   };
