@@ -1,0 +1,45 @@
+/* Design tokens — UI-design.md §2 / §12. The ONLY file with raw hex values. Light mode only (§11). */
+:root {
+  color-scheme: light;
+
+  --bg-app: #F5F5F5;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F5F5F5;
+
+  --text: #0F0A3D;
+  --text-muted: #5B6472;
+  --text-subtle: #94A3B8;
+  --text-on-brand: #FFFFFF;
+
+  --border: #E6ECEE;
+  --border-strong: #BBD5DA;
+
+  --brand: #170C79;
+  --brand-hover: #0F0858;
+  --brand-soft: #E5E3F3;
+
+  --success: #0E6B6B;
+  --success-soft: #DFF1F1;
+  --warning: #B45309;
+  --warning-soft: #FEF3C7;
+  --warning-border: #F3D78A;
+  --danger: #FF0000;
+  --danger-text: #D10000;   /* #FF0000 on white is 4.0:1 — use for small text to hit AA 4.5:1 */
+  --danger-soft: #FFE4E4;
+  --neutral: #5B6472;
+  --neutral-soft: #ECEFF3;
+
+  --font-sans: 'Prompt', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
+
+  --shadow-pop: 0 8px 24px rgba(15, 10, 61, 0.12), 0 2px 6px rgba(15, 10, 61, 0.06);
+  --overlay: rgba(15, 10, 61, 0.35);
+  --focus-ring: 0 0 0 3px var(--brand-soft);
+
+  --sidebar-w: 240px;
+  --topbar-h: 60px;
+}

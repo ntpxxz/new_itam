@@ -1,0 +1,34 @@
+{
+  "name": "assetflow-itam",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AssetFlow — IT Asset Management",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node --no-warnings=ExperimentalWarning --watch-path=server server/index.js",
+    "build": "vite build",
+    "start": "node --no-warnings=ExperimentalWarning server/index.js --prod",
+    "seed": "node --no-warnings=ExperimentalWarning server/seed.js"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/prompt": "^5.3.0",
+    "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "html5-qrcode": "^2.3.8",
+    "lucide-react": "^1.59.0",
+    "multer": "^2.4.0",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.6"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4"
+  }
+}
