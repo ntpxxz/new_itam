@@ -1,29 +1,29 @@
 # IT Store — Database schema
 
-Exported from `data/itam.db` on 2026-10-20 (SQLite). DDL: [schema.sql](schema.sql).
+Exported from `data/it_storage.db` on 2026-10-20 (SQLite). DDL: [schema.sql](schema.sql).
 
 | Table | Rows |
 |---|---:|
-| [access_logs](#access_logs) | 3 |
-| [asset_transactions](#asset_transactions) | 127 |
-| [assets](#assets) | 63 |
-| [audit_logs](#audit_logs) | 32 |
-| [categories](#categories) | 12 |
-| [consumables](#consumables) | 12 |
-| [departments](#departments) | 10 |
+| [access_logs](#access_logs) | 0 |
+| [asset_transactions](#asset_transactions) | 0 |
+| [assets](#assets) | 0 |
+| [audit_logs](#audit_logs) | 0 |
+| [categories](#categories) | 0 |
+| [consumables](#consumables) | 0 |
+| [departments](#departments) | 0 |
 | [documents](#documents) | 0 |
-| [locations](#locations) | 6 |
-| [people](#people) | 16 |
+| [locations](#locations) | 0 |
+| [people](#people) | 0 |
 | [permissions](#permissions) | 19 |
-| [role_permissions](#role_permissions) | 34 |
+| [role_permissions](#role_permissions) | 39 |
 | [roles](#roles) | 3 |
-| [sessions](#sessions) | 1 |
+| [sessions](#sessions) | 0 |
 | [settings](#settings) | 6 |
 | [stock_count_scans](#stock_count_scans) | 0 |
 | [stock_counts](#stock_counts) | 0 |
-| [stock_movements](#stock_movements) | 284 |
-| [users](#users) | 3 |
-| [vendors](#vendors) | 7 |
+| [stock_movements](#stock_movements) | 0 |
+| [users](#users) | 1 |
+| [vendors](#vendors) | 0 |
 
 ## access_logs
 
@@ -53,7 +53,6 @@ Triggers: `access_no_delete`, `access_no_update`
 | `person_id` | INTEGER | yes |  | FK → people.id |
 | `department_id` | INTEGER | yes |  | FK → departments.id |
 | `location_id` | INTEGER | yes |  | FK → locations.id |
-| `section` | TEXT | yes |  |  |
 | `due_date` | TEXT | yes |  |  |
 | `note` | TEXT | yes |  |  |
 | `evidence_path` | TEXT | yes |  |  |
@@ -62,7 +61,7 @@ Triggers: `access_no_delete`, `access_no_update`
 | `doc_id` | INTEGER | yes |  | FK → documents.id |
 | `created_at` | TEXT | NO | `datetime('now')` |  |
 
-Indexes: `idx_atx_asset`
+Indexes: `idx_atx_asset`, `idx_atx_doc`
 
 Triggers: `atx_no_delete`, `atx_no_update`
 
@@ -81,7 +80,6 @@ Triggers: `atx_no_delete`, `atx_no_update`
 | `status` | TEXT | NO | `'available'` |  |
 | `location_id` | INTEGER | yes |  | FK → locations.id |
 | `holder_person_id` | INTEGER | yes |  | FK → people.id |
-| `holder_section` | TEXT | yes |  |  |
 | `department_id` | INTEGER | yes |  | FK → departments.id |
 | `due_date` | TEXT | yes |  |  |
 | `purchase_date` | TEXT | yes |  |  |
@@ -170,7 +168,6 @@ Triggers: `audit_no_delete`, `audit_no_update`
 | `department_id` | INTEGER | yes |  | FK → departments.id |
 | `location_id` | INTEGER | yes |  | FK → locations.id |
 | `vendor_id` | INTEGER | yes |  | FK → vendors.id |
-| `section` | TEXT | yes |  |  |
 | `po_number` | TEXT | yes |  |  |
 | `invoice_number` | TEXT | yes |  |  |
 | `due_date` | TEXT | yes |  |  |
@@ -280,7 +277,6 @@ Indexes: `idx_docs_type`
 | `balance_after` | INTEGER | NO |  |  |
 | `person_id` | INTEGER | yes |  | FK → people.id |
 | `department_id` | INTEGER | yes |  | FK → departments.id |
-| `section` | TEXT | yes |  |  |
 | `unit_cost` | REAL | yes |  |  |
 | `received_date` | TEXT | yes |  |  |
 | `note` | TEXT | yes |  |  |
@@ -288,7 +284,7 @@ Indexes: `idx_docs_type`
 | `doc_id` | INTEGER | yes |  | FK → documents.id |
 | `created_at` | TEXT | NO | `datetime('now')` |  |
 
-Indexes: `idx_sm_cons`
+Indexes: `idx_sm_cons`, `idx_sm_doc`
 
 ## users
 

@@ -41,8 +41,8 @@ function build(req) {
   const parts = [];
   const wantAssetStatus = q.status && STATUS_LABEL[q.status];
   const wantStock = q.status && (STOCK_STATUS.includes(q.status) || q.status === 'low');
-  if (can(req.user, 'asset.view') && !wantStock) parts.push(ASSET_PART);
-  if (can(req.user, 'consumable.view') && !wantAssetStatus) parts.push(CONS_PART);
+  if (can(req.user, 'asset.view') && !wantStock && q.kind !== 'consumable') parts.push(ASSET_PART);
+  if (can(req.user, 'consumable.view') && !wantAssetStatus && q.kind !== 'asset') parts.push(CONS_PART);
   if (!parts.length) return null;
 
   const where = ['1=1'];
@@ -81,13 +81,14 @@ r.get('/export', requirePerm('report.export'), async (req, res, next) => {
     const cat = req.query.category_id ? get('SELECT kind FROM categories WHERE id = ?', req.query.category_id) : null;
     const wb = new ExcelJS.Workbook();
     let n = 0;
-    if (can(req.user, 'asset.view') && (!cat || cat.kind === 'asset')) {
+    const kind = cat?.kind || (['asset', 'consumable'].includes(req.query.kind) ? req.query.kind : null);
+    if (can(req.user, 'asset.view') && (!kind || kind === 'asset')) {
       const p = []; let w = 'a.deleted_at IS NULL';
       if (cat) { w += ' AND a.category_id = ?'; p.push(req.query.category_id); }
       const rows = all(`${ASSET_SELECT} WHERE ${w} ORDER BY a.asset_tag`, ...p);
       addAssetSheet(wb, rows); n += rows.length;
     }
-    if (can(req.user, 'consumable.view') && (!cat || cat.kind === 'consumable')) {
+    if (can(req.user, 'consumable.view') && (!kind || kind === 'consumable')) {
       const p = []; let w = 'x.deleted_at IS NULL';
       if (cat) { w += ' AND x.category_id = ?'; p.push(req.query.category_id); }
       const rows = all(`${CONS_SELECT} WHERE ${w} ORDER BY x.sku`, ...p);

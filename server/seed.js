@@ -1,10 +1,10 @@
-// Wipes data/itam.db and fills it with realistic demo data.
+// Wipes data/it_storage.db and fills it with realistic demo data.
 import './env.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dbFile = process.env.DB_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'itam.db');
+const dbFile = process.env.DB_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'it_storage.db');
 for (const f of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) fs.rmSync(f, { force: true });
 
 const { run, get, tx } = await import('./db.js');
@@ -188,5 +188,5 @@ tx(() => {
   run(`UPDATE stock_movements SET received_date = date(created_at) WHERE type = 'in'`);
 });
 
-console.log('Seed complete → data/itam.db');
+console.log('Seed complete → data/it_storage.db');
 console.log('  admin / Admin@1234   staff / Staff@1234   viewer / Viewer@1234');

@@ -9,7 +9,7 @@ export const DATA_DIR = path.join(ROOT, 'data');
 export const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-export const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'itam.db');
+export const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, 'it_storage.db');
 
 export const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
@@ -24,14 +24,13 @@ function addColumn(table, column, definition, backfill) {
 }
 addColumn('assets', 'received_date', 'TEXT',
   `UPDATE assets SET received_date = COALESCE(purchase_date, date(created_at))`);
-addColumn('assets', 'holder_section', 'TEXT');
-addColumn('documents', 'section', 'TEXT');
-addColumn('asset_transactions', 'section', 'TEXT');
-addColumn('stock_movements', 'section', 'TEXT');
 addColumn('asset_transactions', 'doc_id', 'INTEGER REFERENCES documents(id)');
 addColumn('stock_movements', 'doc_id', 'INTEGER REFERENCES documents(id)');
 addColumn('stock_movements', 'received_date', 'TEXT',
   `UPDATE stock_movements SET received_date = date(created_at) WHERE type = 'in'`);
+// Indexes on migrated columns go here, after the column is guaranteed to exist.
+db.exec(`CREATE INDEX IF NOT EXISTS idx_atx_doc ON asset_transactions(doc_id) WHERE doc_id IS NOT NULL;
+         CREATE INDEX IF NOT EXISTS idx_sm_doc ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;`);
 
 const cache = new Map();
 function stmt(sql) {

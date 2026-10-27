@@ -23,7 +23,7 @@ IT asset management for per-item assets and counted consumables in one register,
 
 ```bash
 npm install
-npm run seed     # สร้างข้อมูลตัวอย่าง (ล้างข้อมูลเดิมใน data/itam.db)
+npm run seed     # สร้างข้อมูลตัวอย่าง (ล้างข้อมูลเดิมใน data/it_storage.db)
 npm run dev      # http://localhost:3093
 ```
 
@@ -54,7 +54,7 @@ npm start        # Express เสิร์ฟ dist/ ที่พอร์ต 309
 | ส่วน | เทคโนโลยี |
 |---|---|
 | Server | Node.js + Express 4 (ESM) |
-| Database | SQLite ผ่าน `node:sqlite` (`data/itam.db`, WAL) |
+| Database | SQLite ผ่าน `node:sqlite` (`data/it_storage.db`, WAL) |
 | Auth | Session ฝั่งเซิร์ฟเวอร์ + httpOnly cookie, bcryptjs |
 | Client | React 18 + Vite + react-router, lucide-react |
 | Fonts | Prompt (UI), IBM Plex Mono (ตัวเลข/รหัส) — โหลดในเครื่อง ใช้ใน intranet ได้ |
@@ -79,7 +79,7 @@ data/               ฐานข้อมูลและไฟล์อัปโ
 
 ## ข้อมูลและการสำรอง
 
-ข้อมูลทั้งหมดอยู่ในโฟลเดอร์ `data/` (`itam.db` + `uploads/`) — สำรองโฟลเดอร์นี้โฟลเดอร์เดียวพอ ควรหยุดเซิร์ฟเวอร์ก่อนคัดลอก หรือใช้ `sqlite3 data/itam.db ".backup backup.db"`
+ข้อมูลทั้งหมดอยู่ในโฟลเดอร์ `data/` (`it_storage.db` + `uploads/`) — สำรองโฟลเดอร์นี้โฟลเดอร์เดียวพอ ควรหยุดเซิร์ฟเวอร์ก่อนคัดลอก หรือใช้ `sqlite3 data/it_storage.db ".backup backup.db"`
 
 ## เอกสารเพิ่มเติม
 

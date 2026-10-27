@@ -17,7 +17,7 @@ npm install
 npm run dev      # http://localhost:3093  (Express + Vite middleware, one port, auto-restart on server/ changes)
 npm run build    # build client into dist/
 npm start        # production: Express serves dist/ on :3093
-npm run seed     # wipe + re-seed demo data (data/itam.db)
+npm run seed     # wipe + re-seed demo data (data/it_storage.db)
 ```
 
 - Port is **3093** (override with `PORT`). Listens on `0.0.0.0` so phones on the LAN can open QR links.
@@ -29,7 +29,7 @@ npm run seed     # wipe + re-seed demo data (data/itam.db)
 | Layer | Choice | Why |
 |---|---|---|
 | Server | Node + Express 4 (ESM) | simple, one process |
-| DB | SQLite via `node:sqlite` (`data/itam.db`) | zero-install, file-based, WAL |
+| DB | SQLite via `node:sqlite` (`data/it_storage.db`) | zero-install, file-based, WAL |
 | Auth | server-side sessions table + httpOnly cookie, `bcryptjs` | idle timeout & revoke are easy |
 | Client | React 18 + Vite + react-router | SPA, served by Express |
 | Icons | `lucide-react` | |
@@ -80,6 +80,7 @@ available ──transfer──▶ available (location/department move)
 ### One register, split only by category
 - The UI has a single **อุปกรณ์** list (`/assets`, API `GET /api/items` = UNION of both tables) and one add form (`/assets/new`).
 - `categories.kind` decides tracking: `asset` = รายชิ้น (tag, serial, lifecycle) · `consumable` = นับจำนวน (stock). There is no separate consumables menu.
+- The list has a type filter (ทั้งหมด / รายชิ้น / วัสดุสิ้นเปลือง → `?kind=asset|consumable` on `GET /api/items` and `/api/items/export`); it narrows the category and status choices to that type.
 - Storage stays in two tables (`assets`, `consumables`) because their workflows differ. Detail pages: `/assets/:id` and `/consumables/:id`; edit: `/assets/:id/edit`, `/consumables/:id/edit` (same form).
 - A category's `kind` cannot change while it has items.
 
@@ -95,7 +96,7 @@ available ──transfer──▶ available (location/department move)
 ### Recipients: free text name + แผนก — `server/recipient.js`
 - Borrow / issue / transfer / stock-out take **typed** `person_name`, `department_name` (UI: `RecipientFields`, inputs with datalist suggestions — no dropdowns).
 - **Name is optional.** A recipient needs a name **or** a department (แผนก) — issuing to a department as a whole leaves `holder_person_id` NULL. Stock-out from the item page needs neither.
-- "Section" = แผนก (per user). There is no separate section field; the legacy `section` / `holder_section` columns stay in the schema (additive migrations) but are unused.
+- "Section" = แผนก (per user). There is no separate section field. Older databases (e.g. `itam.db`) may still carry unused `section` / `holder_section` columns; new databases don't have them.
 - `resolveRecipient()` links an exact (case-insensitive) name/department to the existing record, otherwise creates it (audited), so reports group correctly.
 - Display holders with `who(name, department)` (person, else department) and `isHeld(asset)` from `client/src/format.js`.
 

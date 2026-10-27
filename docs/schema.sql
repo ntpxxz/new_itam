@@ -1,4 +1,4 @@
--- IT Store (ITAM) — database schema exported from data/itam.db on 2026-10-20
+-- IT Store (ITAM) — database schema exported from data/it_storage.db on 2026-10-20
 -- Includes columns added by addColumn() migrations in server/db.js.
 
 -- TABLES
@@ -22,7 +22,6 @@ CREATE TABLE asset_transactions (
   person_id     INTEGER REFERENCES people(id),
   department_id INTEGER REFERENCES departments(id),
   location_id   INTEGER REFERENCES locations(id),
-  section       TEXT,
   due_date      TEXT,
   note          TEXT,
   evidence_path TEXT,
@@ -45,7 +44,6 @@ CREATE TABLE assets (
                    CHECK (status IN ('available','borrowed','issued','repair','pending_disposal','scrapped')),
   location_id      INTEGER REFERENCES locations(id),
   holder_person_id INTEGER REFERENCES people(id),
-  holder_section   TEXT,
   department_id    INTEGER REFERENCES departments(id),
   due_date         TEXT,
   purchase_date    TEXT,
@@ -118,7 +116,6 @@ CREATE TABLE documents (
   department_id INTEGER REFERENCES departments(id),
   location_id   INTEGER REFERENCES locations(id),
   vendor_id     INTEGER REFERENCES vendors(id),
-  section       TEXT,
   po_number     TEXT,
   invoice_number TEXT,
   due_date      TEXT,
@@ -208,7 +205,6 @@ CREATE TABLE stock_movements (
   balance_after  INTEGER NOT NULL,
   person_id      INTEGER REFERENCES people(id),
   department_id  INTEGER REFERENCES departments(id),
-  section        TEXT,
   unit_cost      REAL,
   received_date  TEXT,
   note           TEXT,
@@ -249,6 +245,8 @@ CREATE INDEX idx_access_created ON access_logs(created_at);
 
 CREATE INDEX idx_atx_asset ON asset_transactions(asset_id, created_at);
 
+CREATE INDEX idx_atx_doc ON asset_transactions(doc_id) WHERE doc_id IS NOT NULL;
+
 CREATE INDEX idx_assets_serial ON assets(serial_no);
 
 CREATE INDEX idx_assets_status ON assets(status) WHERE deleted_at IS NULL;
@@ -260,6 +258,8 @@ CREATE INDEX idx_audit_entity ON audit_logs(entity, entity_id);
 CREATE INDEX idx_docs_type ON documents(type, doc_date);
 
 CREATE INDEX idx_sm_cons ON stock_movements(consumable_id, created_at);
+
+CREATE INDEX idx_sm_doc ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;
 
 -- TRIGGERS
 
