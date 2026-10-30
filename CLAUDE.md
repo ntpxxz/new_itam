@@ -19,6 +19,7 @@ npm run build    # build client into dist/
 npm start        # production: Express serves dist/ on :3093
 npm run seed     # wipe + re-seed demo data (data/it_storage.db)
 npm run import-stock -- a.csv b.csv   # load opening consumable stock from inventory CSV exports (skips existing SKUs)
+npm run schema:empty   # regenerate docs/create-empty-db.sql (schema + permissions/roles/settings, no users)
 ```
 
 - Port is **3093** (override with `PORT`). Listens on `0.0.0.0` so phones on the LAN can open QR links.

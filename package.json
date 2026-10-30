@@ -12,7 +12,8 @@
     "build": "vite build",
     "start": "node --no-warnings=ExperimentalWarning server/index.js --prod",
     "seed": "node --no-warnings=ExperimentalWarning server/seed.js",
-    "import-stock": "node --no-warnings=ExperimentalWarning server/import-stock.js"
+    "import-stock": "node --no-warnings=ExperimentalWarning server/import-stock.js",
+    "schema:empty": "node --no-warnings=ExperimentalWarning server/schema-empty.js"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
