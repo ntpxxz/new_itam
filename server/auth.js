@@ -33,7 +33,7 @@ export function permsForRole(roleId) {
 
 function loadUser(userId) {
   const u = get(
-    `SELECT u.id, u.username, u.full_name, u.email, u.role_id, r.name AS role_name, r.key AS role_key
+    `SELECT u.id, u.username, u.full_name, u.role_id, r.name AS role_name, r.key AS role_key
      FROM users u JOIN roles r ON r.id = u.role_id
      WHERE u.id = ? AND u.is_active = 1 AND u.deleted_at IS NULL`, userId);
   if (!u) return null;

@@ -10,7 +10,7 @@ const TABLES = {
   locations: { label: 'สถานที่', fields: ['name', 'branch'], required: ['name'] },
   vendors: { label: 'ผู้ขาย', fields: ['name', 'contact', 'phone', 'email'], required: ['name'] },
   categories: { label: 'หมวดหมู่', fields: ['name', 'kind', 'prefix'], required: ['name', 'kind', 'prefix'] },
-  people: { label: 'พนักงาน', fields: ['emp_code', 'name', 'department_id', 'email', 'phone'], required: ['name'] },
+  people: { label: 'พนักงาน', fields: ['name', 'department_id'], required: ['name'] },
 };
 
 const LIST_SQL = {
@@ -32,12 +32,6 @@ function validate(table, body, before = null) {
     if (dup) throw bad(`มี${def.label}ชื่อ "${body.name}" อยู่แล้ว — ใช้ชื่ออื่น หรือแก้ไขรายการเดิม`);
   }
   if (table === 'people') {
-    const code = String(body.emp_code ?? '').trim();
-    body.emp_code = code || null;
-    if (code && code !== (before?.emp_code ?? '')) {
-      const other = get('SELECT name FROM people WHERE emp_code = ? COLLATE NOCASE AND deleted_at IS NULL AND id IS NOT ?', code, before?.id ?? null);
-      if (other) throw bad(`รหัสพนักงาน ${code} ซ้ำกับ "${other.name}" — ตรวจสอบรหัสแล้วลองใหม่`);
-    }
     const dept = body.department_id === '' || body.department_id == null ? null : Number(body.department_id);
     if (dept !== null && !get('SELECT id FROM departments WHERE id = ? AND deleted_at IS NULL', dept)) {
       throw bad('ไม่พบแผนกที่เลือก (อาจถูกลบไปแล้ว) — เลือกแผนกใหม่');
@@ -66,9 +60,8 @@ r.get('/:table', requireAuth, (req, res) => {
   if (req.query.kind && table === 'categories') { sql += ' AND c.kind = ?'; params.push(req.query.kind); }
   if (req.query.q) {
     const alias = table === 'people' ? 'p.' : table === 'categories' ? 'c.' : '';
-    sql += ` AND (${alias}name LIKE ? ESCAPE '\\'${table === 'people' ? " OR p.emp_code LIKE ? ESCAPE '\\'" : ''})`;
+    sql += ` AND ${alias}name LIKE ? ESCAPE '\\'`;
     params.push(likeTerm(req.query.q));
-    if (table === 'people') params.push(likeTerm(req.query.q));
   }
   sql += ' ORDER BY name COLLATE NOCASE';
   res.json({ rows: all(sql, ...params) });

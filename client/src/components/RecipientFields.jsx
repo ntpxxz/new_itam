@@ -32,7 +32,7 @@ export default function RecipientFields({ value, onChange, error, required = tru
         hint={value.person_name.trim() && !known ? 'ชื่อใหม่ — ระบบจะเพิ่มเข้ารายชื่อพนักงานให้' : required ? 'ไม่บังคับ ถ้ากรอกแผนกแล้ว' : 'ไม่บังคับ'}>
         <input className="input" list={ids.p} value={value.person_name} onChange={set('person_name')} placeholder="พิมพ์ชื่อ หรือเว้นว่าง" autoComplete="off" />
       </Field>
-      <datalist id={ids.p}>{people.map((p) => <option key={p.id} value={p.name}>{[p.emp_code, p.department_name].filter(Boolean).join(' · ')}</option>)}</datalist>
+      <datalist id={ids.p}>{people.map((p) => <option key={p.id} value={p.name}>{p.department_name || ''}</option>)}</datalist>
       </>}
 
       {fields.includes('department_name') && <>

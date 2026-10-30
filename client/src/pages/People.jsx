@@ -12,10 +12,7 @@ export default function People() {
       <MasterTable table="people" title="รายชื่อพนักงาน" addLabel="เพิ่มพนักงาน" searchable selectable
         bulkSet={{ field: 'department_id', label: 'แผนก', options: deptOptions, emptyLabel: '— ไม่ระบุแผนก —' }} columns={[
         { key: 'name', label: 'ชื่อ-นามสกุล', input: 'text', required: true, render: (r) => <Link to={`/assets?q=${encodeURIComponent(r.name)}`}>{r.name}</Link> },
-        { key: 'emp_code', label: 'รหัสพนักงาน', input: 'text', mono: true },
         { key: 'department_id', label: 'แผนก', input: 'select', options: deptOptions, render: (r) => r.department_name || '—' },
-        { key: 'email', label: 'อีเมล', input: 'email' },
-        { key: 'phone', label: 'โทรศัพท์', input: 'text' },
       ]} />
     </>
   );

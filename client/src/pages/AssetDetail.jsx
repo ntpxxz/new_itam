@@ -159,7 +159,7 @@ export default function AssetDetail() {
                   <span className="avatar" aria-hidden>{initials(who(a.holder_name, a.department_name))}</span>
                   <div style={{ minWidth: 0 }}>
                     <div className="cell-main">{who(a.holder_name, a.department_name)}</div>
-                    <div className="cell-sub">{a.holder_name ? [a.holder_code, a.department_name].filter(Boolean).join(' · ') : 'ทั้งแผนก (ไม่ระบุชื่อ)'}</div>
+                    <div className="cell-sub">{a.holder_name ? a.department_name || '' : 'ทั้งแผนก (ไม่ระบุชื่อ)'}</div>
                   </div>
                 </div>
               ) : (

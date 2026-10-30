@@ -13,8 +13,7 @@ const r = Router();
 export const SELECT = `
   SELECT a.*, c.name AS category_name, c.prefix AS category_prefix,
          l.name AS location_name, l.branch AS location_branch,
-         p.name AS holder_name, p.emp_code AS holder_code,
-         d.name AS department_name, v.name AS vendor_name
+         p.name AS holder_name, d.name AS department_name, v.name AS vendor_name
   FROM assets a
   JOIN categories c ON c.id = a.category_id
   LEFT JOIN locations l ON l.id = a.location_id

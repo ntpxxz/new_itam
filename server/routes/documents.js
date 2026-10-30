@@ -131,7 +131,7 @@ r.post('/issue', requirePerm('asset.transact', 'consumable.move'), (req, res) =>
 
 /* ---------- read ---------- */
 const DOC_SELECT = `
-  SELECT d.*, p.name AS person_name, p.emp_code, dp.name AS department_name, l.name AS location_name, v.name AS vendor_name,
+  SELECT d.*, p.name AS person_name, dp.name AS department_name, l.name AS location_name, v.name AS vendor_name,
          u.full_name AS created_by_name,
          (SELECT COUNT(*) FROM asset_transactions t WHERE t.doc_id = d.id) AS asset_count,
          (SELECT COALESCE(SUM(ABS(m.qty)),0) FROM stock_movements m WHERE m.doc_id = d.id) AS unit_count,

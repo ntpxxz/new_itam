@@ -45,7 +45,7 @@ export default function DocumentDetail() {
             </>
           ) : (
             <>
-              <dt>ผู้รับ</dt><dd>{d.person_name || 'ทั้งแผนก (ไม่ระบุชื่อ)'}{d.emp_code && <span className="tag"> ({d.emp_code})</span>}</dd>
+              <dt>ผู้รับ</dt><dd>{d.person_name || 'ทั้งแผนก (ไม่ระบุชื่อ)'}</dd>
               <dt>แผนก</dt><dd>{d.department_name || '—'}</dd>
               <dt>ประเภท</dt><dd>{d.mode === 'borrow' ? <Chip tone="brand">ยืม (ต้องคืน)</Chip> : <Chip tone="brand" dot={false}>เบิกออก</Chip>}</dd>
             </>

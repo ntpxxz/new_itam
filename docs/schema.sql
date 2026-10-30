@@ -134,11 +134,8 @@ CREATE TABLE locations (
 
 CREATE TABLE people (
   id            INTEGER PRIMARY KEY,
-  emp_code      TEXT,
   name          TEXT NOT NULL,
   department_id INTEGER REFERENCES departments(id),
-  email         TEXT,
-  phone         TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at    TEXT
 );
@@ -218,7 +215,6 @@ CREATE TABLE users (
   username        TEXT UNIQUE NOT NULL COLLATE NOCASE,
   password_hash   TEXT NOT NULL,
   full_name       TEXT NOT NULL,
-  email           TEXT,
   role_id         INTEGER NOT NULL REFERENCES roles(id),
   is_active       INTEGER NOT NULL DEFAULT 1,
   failed_attempts INTEGER NOT NULL DEFAULT 0,

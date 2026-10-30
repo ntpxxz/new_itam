@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS } from '../permissions.js';
 const r = Router();
 
 /* ---------- users ---------- */
-const USER_COLS = `u.id, u.username, u.full_name, u.email, u.role_id, r.name AS role_name, u.is_active,
+const USER_COLS = `u.id, u.username, u.full_name, u.role_id, r.name AS role_name, u.is_active,
   u.locked_until, u.last_login_at, u.created_at`;
 
 r.get('/users', requirePerm('user.manage'), (req, res) => {
@@ -16,7 +16,7 @@ r.get('/users', requirePerm('user.manage'), (req, res) => {
 });
 
 r.post('/users', requirePerm('user.manage'), (req, res) => {
-  const { username, full_name, email, role_id, password } = req.body || {};
+  const { username, full_name, role_id, password } = req.body || {};
   if (!/^[a-zA-Z0-9._-]{3,32}$/.test(username || '')) throw bad('ชื่อผู้ใช้ต้องเป็นภาษาอังกฤษ/ตัวเลข 3–32 ตัว (ใช้ . _ - ได้)');
   if (!full_name?.trim()) throw bad('กรุณากรอกชื่อ-นามสกุล');
   if (!get('SELECT 1 FROM roles WHERE id = ?', role_id)) throw bad('กรุณาเลือกบทบาท');
@@ -24,8 +24,8 @@ r.post('/users', requirePerm('user.manage'), (req, res) => {
   if (problem) throw bad(problem);
   if (get('SELECT 1 FROM users WHERE username = ?', username)) throw bad('ชื่อผู้ใช้นี้ถูกใช้แล้ว');
   const id = tx(() => {
-    const info = run('INSERT INTO users (username, password_hash, full_name, email, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?, ?)',
-      username, hashPassword(password), full_name.trim(), email, role_id, now());
+    const info = run('INSERT INTO users (username, password_hash, full_name, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?)',
+      username, hashPassword(password), full_name.trim(), role_id, now());
     const row = get('SELECT * FROM users WHERE id = ?', info.lastInsertRowid);
     audit(req, 'user', row.id, 'create', null, row);
     return row.id;
@@ -36,14 +36,14 @@ r.post('/users', requirePerm('user.manage'), (req, res) => {
 r.put('/users/:id', requirePerm('user.manage'), (req, res) => {
   const before = get('SELECT * FROM users WHERE id = ? AND deleted_at IS NULL', req.params.id);
   if (!before) throw notFound('ผู้ใช้');
-  const { full_name, email, role_id, is_active, password, unlock } = req.body || {};
+  const { full_name, role_id, is_active, password, unlock } = req.body || {};
   const isSelf = before.id === req.user.id;
   if (isSelf && (is_active === false || is_active === 0)) throw bad('ปิดใช้งานบัญชีของตัวเองไม่ได้');
   if (isSelf && role_id && Number(role_id) !== before.role_id) throw bad('เปลี่ยนบทบาทของตัวเองไม่ได้ — ให้ Admin คนอื่นเปลี่ยนให้');
   if (role_id && !get('SELECT 1 FROM roles WHERE id = ?', role_id)) throw bad('บทบาทไม่ถูกต้อง');
   tx(() => {
-    run('UPDATE users SET full_name = ?, email = ?, role_id = ?, is_active = ? WHERE id = ?',
-      full_name?.trim() || before.full_name, email ?? before.email, role_id || before.role_id,
+    run('UPDATE users SET full_name = ?, role_id = ?, is_active = ? WHERE id = ?',
+      full_name?.trim() || before.full_name, role_id || before.role_id,
       is_active === undefined ? before.is_active : (is_active ? 1 : 0), before.id);
     if (password) {
       const problem = passwordProblem(password);

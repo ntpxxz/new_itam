@@ -192,11 +192,8 @@ Indexes: `idx_docs_type`
 | Column | Type | Null | Default | Key |
 |---|---|---|---|---|
 | `id` | INTEGER | NO |  | PK |
-| `emp_code` | TEXT | yes |  |  |
 | `name` | TEXT | NO |  |  |
 | `department_id` | INTEGER | yes |  | FK → departments.id |
-| `email` | TEXT | yes |  |  |
-| `phone` | TEXT | yes |  |  |
 | `created_at` | TEXT | NO | `datetime('now')` |  |
 | `deleted_at` | TEXT | yes |  |  |
 
@@ -294,7 +291,6 @@ Indexes: `idx_sm_cons`, `idx_sm_doc`
 | `username` | TEXT | NO |  | UNIQUE |
 | `password_hash` | TEXT | NO |  |  |
 | `full_name` | TEXT | NO |  |  |
-| `email` | TEXT | yes |  |  |
 | `role_id` | INTEGER | NO |  | FK → roles.id |
 | `is_active` | INTEGER | NO | `1` |  |
 | `failed_attempts` | INTEGER | NO | `0` |  |

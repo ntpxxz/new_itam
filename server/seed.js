@@ -25,10 +25,10 @@ tx(() => {
   const ids = (table, rows, cols) => rows.map((r) => Number(run(`INSERT INTO ${table} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, ...r).lastInsertRowid));
 
   run('UPDATE users SET full_name = ? WHERE username = ?', 'สมชาย ผู้ดูแลระบบ', 'admin');
-  run('INSERT INTO users (username, password_hash, full_name, email, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?, ?)',
-    'staff', hashPassword('Staff@1234'), 'วิภา เจ้าหน้าที่ไอที', 'wipa@example.com', roleId('it_staff'), ts(new Date()));
-  run('INSERT INTO users (username, password_hash, full_name, email, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?, ?)',
-    'viewer', hashPassword('Viewer@1234'), 'กิตติ ผู้ตรวจสอบ', 'kitti@example.com', roleId('viewer'), ts(new Date()));
+  run('INSERT INTO users (username, password_hash, full_name, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?)',
+    'staff', hashPassword('Staff@1234'), 'วิภา เจ้าหน้าที่ไอที', roleId('it_staff'), ts(new Date()));
+  run('INSERT INTO users (username, password_hash, full_name, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?)',
+    'viewer', hashPassword('Viewer@1234'), 'กิตติ ผู้ตรวจสอบ', roleId('viewer'), ts(new Date()));
   const staffId = get(`SELECT id FROM users WHERE username='staff'`).id;
   const adminId = get(`SELECT id FROM users WHERE username='admin'`).id;
   const actors = [adminId, staffId, staffId];
@@ -54,8 +54,7 @@ tx(() => {
   const names = ['ณัฐพล ศรีสุข', 'กมลวรรณ ทองดี', 'ปิยะพงษ์ แก้วมณี', 'สุภาวดี จันทร์เพ็ญ', 'ธนากร วงศ์ใหญ่', 'อรุณี สายทอง', 'วีรยุทธ บุญมา',
     'ชลธิชา พรหมมา', 'อนุชา รัตนกุล', 'พิมพ์ชนก ใจดี', 'ภานุวัฒน์ สมบูรณ์', 'ศิริพร นาคสวัสดิ์', 'ธีรเดช อินทร์แก้ว', 'มณีรัตน์ ประเสริฐ',
     'กฤษดา ชัยมงคล', 'จิราพร สุขเจริญ'];
-  const people = ids('people', names.map((n, i) => [`EMP${String(1001 + i)}`, n, depts[i % depts.length], `emp${1001 + i}@example.com`, `08${String(10000000 + i * 7654321).slice(0, 8)}`]),
-    ['emp_code', 'name', 'department_id', 'email', 'phone']);
+  const people = ids('people', names.map((n, i) => [n, depts[i % depts.length]]), ['name', 'department_id']);
 
   const models = [
     [0, 'โน้ตบุ๊ก Dell Latitude 5440', 'Dell', 'Latitude 5440', 'Core i5-1345U / 16GB / 512GB SSD', 32900, 14],

@@ -39,7 +39,7 @@ export default function UsersPage() {
                       <td>
                         <div className="row" style={{ gap: 10 }}>
                           <span className="avatar" aria-hidden>{initials(u.full_name)}</span>
-                          <div><div className="cell-main">{u.full_name}{u.id === me.id && <span className="muted"> (คุณ)</span>}</div><div className="tag">{u.username}{u.email && ` · ${u.email}`}</div></div>
+                          <div><div className="cell-main">{u.full_name}{u.id === me.id && <span className="muted"> (คุณ)</span>}</div><div className="tag">{u.username}</div></div>
                         </div>
                       </td>
                       <td><Chip tone="brand" dot={false}>{u.role_name}</Chip></td>
@@ -80,7 +80,7 @@ export default function UsersPage() {
 function UserDialog({ user, roles, onClose, onDone }) {
   const toast = useToast();
   const isNew = !user.id;
-  const [v, setV] = useState({ username: user.username || '', full_name: user.full_name || '', email: user.email || '', role_id: user.role_id || '', password: '' });
+  const [v, setV] = useState({ username: user.username || '', full_name: user.full_name || '', role_id: user.role_id || '', password: '' });
   const [busy, setBusy] = useState(false);
   const set = (k) => (x) => setV((s) => ({ ...s, [k]: x?.target ? x.target.value : x }));
   const submit = async (e) => {
@@ -88,7 +88,7 @@ function UserDialog({ user, roles, onClose, onDone }) {
     setBusy(true);
     try {
       if (isNew) await api.post('/api/admin/users', v);
-      else await api.put(`/api/admin/users/${user.id}`, { full_name: v.full_name, email: v.email, role_id: v.role_id });
+      else await api.put(`/api/admin/users/${user.id}`, { full_name: v.full_name, role_id: v.role_id });
       toast.success(isNew ? `สร้างบัญชี ${v.username} แล้ว` : 'บันทึกแล้ว');
       onDone();
     } catch (ex) { toast.error(ex); } finally { setBusy(false); }
@@ -100,7 +100,6 @@ function UserDialog({ user, roles, onClose, onDone }) {
       <form id="user-form" onSubmit={submit} className="stack" style={{ gap: 14 }} noValidate>
         {isNew && <Field label="ชื่อผู้ใช้ (ใช้ล็อกอิน)" required hint="ภาษาอังกฤษ/ตัวเลข 3–32 ตัว"><input className="input mono" value={v.username} onChange={set('username')} autoCapitalize="none" /></Field>}
         <Field label="ชื่อ-นามสกุล" required><input className="input" value={v.full_name} onChange={set('full_name')} /></Field>
-        <Field label="อีเมล"><input className="input" type="email" value={v.email} onChange={set('email')} /></Field>
         <Field label="บทบาท" required>
           <Select value={v.role_id} onChange={set('role_id')} options={roles.map((r) => ({ value: r.id, label: `${r.name} — ${r.description || ''}` }))} placeholder="— เลือกบทบาท —" />
         </Field>

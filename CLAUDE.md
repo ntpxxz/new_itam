@@ -99,7 +99,8 @@ available ──transfer──▶ available (location/department move)
 ### Recipients: free text name + แผนก — `server/recipient.js`
 - Borrow / issue / transfer / stock-out take **typed** `person_name`, `department_name` (UI: `RecipientFields`, inputs with datalist suggestions — no dropdowns).
 - **Name is optional.** A recipient needs a name **or** a department (แผนก) — issuing to a department as a whole leaves `holder_person_id` NULL. Stock-out from the item page needs neither.
-- "Section" = แผนก (per user). There is no separate section field. Older databases (e.g. `itam.db`) may still carry unused `section` / `holder_section` columns; new databases don't have them.
+- "Section" = แผนก (per user). There is no separate section field.
+- People (พนักงาน) = name + แผนก only — no employee code, email or phone. Users have no email; login is username + password only. Older databases may still carry unused `people.emp_code`, `people.email`, `people.phone`, `users.email` columns; new databases don't. Older databases (e.g. `itam.db`) may still carry unused `section` / `holder_section` columns; new databases don't have them.
 - `resolveRecipient()` links an exact (case-insensitive) name/department to the existing record, otherwise creates it (audited), so reports group correctly.
 - Display holders with `who(name, department)` (person, else department) and `isHeld(asset)` from `client/src/format.js`.
 
