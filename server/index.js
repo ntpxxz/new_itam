@@ -17,6 +17,7 @@ import stockCountRoutes from './routes/stockcount.js';
 import itemRoutes from './routes/items.js';
 import documentRoutes from './routes/documents.js';
 import reportRoutes from './routes/reports.js';
+import assistantRoutes from './routes/assistant.js';
 
 const PORT = Number(process.env.PORT || 3093);
 const PROD = process.argv.includes('--prod') || process.env.NODE_ENV === 'production';
@@ -58,6 +59,7 @@ app.use('/api/master', masterRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/assistant', assistantRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/consumables', consumableRoutes);
 app.use('/api/dashboard', dashboardRoutes);

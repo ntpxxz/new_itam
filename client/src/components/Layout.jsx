@@ -9,6 +9,7 @@ import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
 import { initials } from '../format.js';
 import { Menu } from './ui.jsx';
+import AssistantChat from './AssistantChat.jsx';
 
 const NAV = [
   { label: 'ภาพรวม', items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, perm: 'dashboard.view', end: true }] },
@@ -166,6 +167,7 @@ export default function Layout() {
         <main className="content" id="main">
           <Outlet />
         </main>
+        <AssistantChat />
       </div>
     </div>
   );

@@ -107,6 +107,12 @@ available ──transfer──▶ available (location/department move)
 - Value: assets = purchase price, consumables = qty × current unit cost. Permission `report.view` (+ `report.export` for Excel).
 - New permissions are granted to default roles on existing DBs by `bootstrap()` (only keys added in that version).
 
+### Chat assistant (ผู้ช่วยบันทึกรายการ) — `server/assistant-parse.js`, `server/routes/assistant.js`, `client/src/components/AssistantChat.jsx`
+- Floating chat (bottom-right, every page) for users with `asset.create` / `consumable.move` / `asset.transact`. **Rule-based, no AI, no external calls** (user chose free/offline).
+- Grammar: `รับเข้า|เบิก|ยืม` (or receive/issue/borrow) + items (`<name or code> <qty> [unit] [@price]`, split by `,` / `และ` / `and`) + `ให้ <name> [แผนก<dept>]` + `คืน <date>` + `วันที่ <date>|เมื่อวาน`. Dates: `15/11`, `15/11/69` (พ.ศ.), `5 พ.ย.`, `2026-11-15`, `อีก 7 วัน`.
+- `assistant-parse.js` is pure text parsing; the route resolves items (exact SKU/tag/serial first, then all-words match), checks stock/status, and returns a **draft** or Thai problems + `choices` (buttons that resend the request with a precise code).
+- The assistant never writes. The user presses บันทึก on the draft card and the client posts it to `/api/documents/receive|issue`, so slip rules, history and audit stay in `documents.js`. Receiving brand-new per-unit assets stays on `/receive` (needs category/serials).
+
 ### Received date (วันที่รับเข้า)
 - `assets.received_date` (defaults to today, not future, not before `purchase_date`) and `stock_movements.received_date` for `in` rows (opening stock + every รับเข้า).
 - Monthly consumable spend on the dashboard uses `received_date`.
@@ -173,6 +179,7 @@ available ──transfer──▶ available (location/department move)
 
 ### Phase 3
 - [x] Stock count sessions: scan per location → summary of found / missing / unexpected
+- [x] Chat assistant (rule-based): type a receive/issue/borrow request → reviewed draft slip → บันทึก
 - [ ] Approval workflow for borrow/issue requests (end-user self-service)
 - [ ] Email/LINE notifications for overdue & warranty
 - [ ] 2FA, AD/SSO
