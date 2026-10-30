@@ -90,6 +90,7 @@ available ──transfer──▶ available (location/department move)
 - A slip (`documents` table, `RCV-YYYYMM-0001` / `ISS-YYYYMM-0001`) holds many lines mixing รายชิ้น and นับจำนวน. Lines are the normal history rows (`asset_transactions` / `stock_movements`) tagged with `doc_id`.
 - All lines apply in **one DB transaction** — any invalid line rolls back the whole slip; errors say `รายการที่ N: …`.
 - Receive: นับจำนวน → `moveStock('in')`; รายชิ้น → `createAsset()` once per unit (serials optional, ≤200/line).
+- Receive "รายการใหม่" line: the category picker lists **both** kinds; the chosen category decides the line. รายชิ้น → new assets; นับจำนวน → `createConsumable()` (SKU barcode, unit, reorder point; needs `consumable.manage`) then `moveStock('in')`, same transaction.
 - Receive date (`doc_date`) may be backdated (not future); optional slip `purchase_date` must be ≤ `doc_date` and defaults to it. Slip number month and asset-tag year follow those dates.
 - Issue: mode `issue` (เบิกถาวร) or `borrow` (due date). Assets → `applyAction()`; consumables → `moveStock('out')`. Consumables cannot be borrowed.
 - Issue date (`doc_date`) may be backdated: not in the future, and for each asset not before its `received_date` or latest movement. Borrow due date must be ≥ `doc_date`. History rows keep `created_at` as the record time; the effective date comes from `documents.doc_date` (shown as วันที่ … · บันทึก …).

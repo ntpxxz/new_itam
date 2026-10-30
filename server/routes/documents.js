@@ -4,7 +4,7 @@ import { requirePerm, can } from '../auth.js';
 import { audit } from '../audit.js';
 import { HttpError, bad, notFound, paging, likeTerm, isDate, today, toInt } from './util.js';
 import { createAsset, applyAction } from './assets.js';
-import { moveStock } from './consumables.js';
+import { moveStock, createConsumable } from './consumables.js';
 import { resolveRecipient } from '../recipient.js';
 
 // Receive (ใบรับเข้า) and issue (ใบเบิก) slips. A slip holds many lines, mixing per-item assets and
@@ -46,7 +46,13 @@ r.post('/receive', requirePerm('asset.create', 'consumable.move'), (req, res) =>
         if (l.kind === 'consumable') {
           if (!can(req.user, 'consumable.move')) throw new HttpError(403, 'คุณไม่มีสิทธิ์รับเข้าวัสดุสิ้นเปลือง');
           const note = [b.po_number && `PO ${b.po_number}`, l.note].filter(Boolean).join(' · ') || null;
-          moveStock(req, l.consumable_id, { type: 'in', qty: l.qty, unit_cost: l.unit_cost, received_date: doc_date, note }, docId);
+          let consumableId = l.consumable_id;
+          if (!consumableId) {
+            if (!can(req.user, 'consumable.manage')) throw new HttpError(403, 'คุณไม่มีสิทธิ์สร้างรายการนับจำนวนใหม่ — เลือกรายการที่มีอยู่แล้ว');
+            consumableId = createConsumable(req, { sku: l.sku, category_id: l.category_id, name: l.name, unit: l.unit, reorder_point: l.reorder_point,
+              unit_cost: l.unit_cost, location_id, vendor_id });
+          }
+          moveStock(req, consumableId, { type: 'in', qty: l.qty, unit_cost: l.unit_cost, received_date: doc_date, note }, docId);
           units += toInt(l.qty);
         } else if (l.kind === 'asset') {
           if (!can(req.user, 'asset.create')) throw new HttpError(403, 'คุณไม่มีสิทธิ์รับเข้าอุปกรณ์รายชิ้น');

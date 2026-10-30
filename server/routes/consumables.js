@@ -123,13 +123,11 @@ r.get('/:id', requirePerm('consumable.view'), (req, res) => {
   res.json({ item, movements, usage });
 });
 
-r.post('/', requirePerm('consumable.manage'), (req, res) => {
-  const { v } = normalize(req.body || {});
-  const sku = checkSku(req.body.sku);
-  const initial = toInt(req.body.qty_on_hand) || 0;
-  if (initial < 0) throw bad('จำนวนเริ่มต้นต้องไม่ติดลบ');
-  const received = checkReceived(req.body.received_date);
-  const id = tx(() => {
+// Creates a consumable (and its opening stock row when `initial` > 0). Reused by รับเข้า slips for brand-new items.
+export function createConsumable(req, body, { initial = 0, received = today() } = {}) {
+  const { v } = normalize(body || {});
+  const sku = checkSku(body.sku);
+  return tx(() => {
     const info = run(`INSERT INTO consumables (sku, ${FIELDS.join(',')}, qty_on_hand) VALUES (?, ${FIELDS.map(() => '?').join(',')}, ?)`,
       sku, ...FIELDS.map((f) => v[f]), initial);
     const newId = Number(info.lastInsertRowid);
@@ -140,6 +138,12 @@ r.post('/', requirePerm('consumable.manage'), (req, res) => {
     audit(req, 'consumable', newId, 'create', null, get('SELECT * FROM consumables WHERE id = ?', newId));
     return newId;
   });
+}
+
+r.post('/', requirePerm('consumable.manage'), (req, res) => {
+  const initial = toInt(req.body?.qty_on_hand) || 0;
+  if (initial < 0) throw bad('จำนวนเริ่มต้นต้องไม่ติดลบ');
+  const id = createConsumable(req, req.body, { initial, received: checkReceived(req.body?.received_date) });
   res.status(201).json(get(`${SELECT} WHERE x.id = ?`, id));
 });
 
