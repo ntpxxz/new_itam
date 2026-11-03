@@ -27,7 +27,9 @@ export default function AssetForm() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = useAuth();
-  const [form, setForm] = useState({ ...EMPTY, category_id: sp.get('category_id') || '', received_date: todayISO() });
+  // ?sku=&name=&unit_cost= prefill a new item (e.g. "สร้างรายการใหม่" from a CSV receive).
+  const [form, setForm] = useState({ ...EMPTY, category_id: sp.get('category_id') || '', sku: sp.get('sku') || '', name: sp.get('name') || '',
+    unit_cost: sp.get('unit_cost') || '', qty_on_hand: sp.get('sku') ? '0' : '', received_date: todayISO() });
   const [tag, setTag] = useState('');
   const [loaded, setLoaded] = useState(!isEdit);
   const [busy, setBusy] = useState(false);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PackagePlus, Laptop, Package, Trash2, Plus, Save } from 'lucide-react';
+import { PackagePlus, Laptop, Package, Trash2, Plus, Save, FileUp } from 'lucide-react';
 import { api } from '../api.js';
 import { useLookup } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast.jsx';
 import { PageHeader, Card, Field, Select, Empty, CategorySelect, KIND_LABEL } from '../components/ui.jsx';
 import ItemPicker from '../components/ItemPicker.jsx';
 import DocList from '../components/DocList.jsx';
+import ReceiveCsvDialog from '../components/ReceiveCsvDialog.jsx';
 import { fmtMoney, fmtNum, todayISO, daysFromToday } from '../format.js';
 
 let seq = 1;
@@ -28,6 +29,7 @@ export default function Receive() {
   const [lines, setLines] = useState([]);
   const [busy, setBusy] = useState(false);
   const [errs, setErrs] = useState({});
+  const [csvOpen, setCsvOpen] = useState(false);
   const canCons = can('consumable.move');
   const canAsset = can('asset.create');
   const canNewCons = canCons && can('consumable.manage');
@@ -47,6 +49,22 @@ export default function Receive() {
       if (found) return ls.map((l) => (l === found ? { ...l, qty: String((parseInt(l.qty, 10) || 0) + 1) } : l));
       return [...ls, { key: seq++, kind: 'consumable', item: row, qty: '1', unit_cost: row.price ?? '' }];
     });
+  };
+
+  // Rows ticked in the CSV dialog: add to the slip, summing qty into a line that already has the item.
+  const addFromCsv = (picked) => {
+    setLines((ls) => {
+      let next = [...ls];
+      for (const { item, qty, unit_cost } of picked) {
+        const found = next.find((l) => l.kind === 'consumable' && l.item.id === item.id);
+        if (found) next = next.map((l) => (l === found ? { ...l, qty: String((parseInt(l.qty, 10) || 0) + qty) } : l));
+        else next.push({ key: seq++, kind: 'consumable', qty: String(qty), unit_cost: unit_cost ?? '',
+          item: { id: item.id, code: item.sku, name: item.name, unit: item.unit, qty_on_hand: item.qty_on_hand, price: item.unit_cost } });
+      }
+      return next;
+    });
+    const units = picked.reduce((s, r) => s + r.qty, 0);
+    toast.success(`เพิ่ม ${picked.length} รายการ (${fmtNum(units)} หน่วย) จากไฟล์แล้ว — ตรวจแล้วกด “บันทึกรับเข้า”`);
   };
 
   const total = lines.reduce((s, l) => s + qtyOf(l) * (Number(l.kind === 'consumable' ? l.unit_cost : l.unit_price) || 0), 0);
@@ -117,8 +135,11 @@ export default function Receive() {
         </div>
       </Card>
 
-      <Card title="รายการที่รับเข้า" actions={canNew && (
-        <button className="btn btn-sm" onClick={() => setLines((ls) => [...ls, newItemLine()])}><Plus size={14} />รายการใหม่</button>
+      <Card title="รายการที่รับเข้า" actions={(canCons || canNew) && (
+        <div className="row" style={{ gap: 8 }}>
+          {canCons && <button className="btn btn-sm" onClick={() => setCsvOpen(true)}><FileUp size={14} />นำเข้า CSV</button>}
+          {canNew && <button className="btn btn-sm" onClick={() => setLines((ls) => [...ls, newItemLine()])}><Plus size={14} />รายการใหม่</button>}
+        </div>
       )}>
         <div className="stack" style={{ gap: 12 }}>
           {canCons && (
@@ -223,6 +244,7 @@ export default function Receive() {
       </Card>
 
       <DocList type="receive" title="ใบรับเข้าล่าสุด" />
+      {csvOpen && <ReceiveCsvDialog onAdd={addFromCsv} onClose={() => setCsvOpen(false)} />}
     </>
   );
 }
