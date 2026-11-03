@@ -17,7 +17,7 @@ npm install
 npm run dev      # http://localhost:3093  (Express + Vite middleware, one port, auto-restart on server/ changes)
 npm run build    # build client into dist/
 npm start        # production: Express serves dist/ on :3093
-npm run seed     # wipe + re-seed demo data (data/it_storage.db)
+npm run seed     # wipe + re-seed demo data (data/it_storage.db; on SQL Server it refuses unless `-- --force`)
 npm run import-stock -- a.csv b.csv   # load opening consumable stock from inventory CSV exports (skips existing SKUs)
 npm run schema:empty   # regenerate docs/create-empty-db.sql (schema + permissions/roles/settings, no users)
 npm run migrate:mssql -- data/it_storage.db [--replace] [--dry-run]   # copy a SQLite DB into the SQL Server DB from .env, keeping ids

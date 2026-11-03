@@ -5,6 +5,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const mssql = String(process.env.DB_CLIENT || '').toLowerCase() === 'mssql';
+if (mssql && !process.argv.includes('--force')) {
+  console.error(`Refusing to seed: DB_CLIENT=mssql would drop every table in ${process.env.MSSQL_DATABASE || 'ITAM'} and replace it with demo data.
+Run "npm run seed -- --force" if that is really what you want.`);
+  process.exit(1);
+}
 if (!mssql) {
   const dbFile = process.env.DB_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'it_storage.db');
   for (const f of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) fs.rmSync(f, { force: true });
