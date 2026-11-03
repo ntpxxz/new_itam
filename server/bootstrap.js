@@ -1,5 +1,5 @@
 import { all, get, run, tx, now, minutesAgo } from './db.js';
-import { PERMISSIONS, DEFAULT_ROLES, DEFAULT_SETTINGS } from './permissions.js';
+import { PERMISSIONS, DEFAULT_ROLES, DEFAULT_SETTINGS, SPLIT_FROM } from './permissions.js';
 import { hashPassword } from './auth.js';
 
 const insertMissing = (table, cols, values) => run(
@@ -17,6 +17,12 @@ export async function bootstrap() {
       if (known.has(key)) await run('UPDATE permissions SET name = ?, grp = ? WHERE "key" = ?', name, grp, key);
       else await run('INSERT INTO permissions ("key", name, grp) VALUES (?, ?, ?)', key, name, grp);
     }
+    // Existing DB: a permission split out of an older one goes to every role that holds the older one.
+    if (known.size) {
+      for (const key of added.filter((k) => SPLIT_FROM[k])) {
+        await run('INSERT INTO role_permissions (role_id, perm_key) SELECT role_id, ? FROM role_permissions WHERE perm_key = ?', key, SPLIT_FROM[key]);
+      }
+    }
     for (const role of DEFAULT_ROLES) {
       const existing = await get('SELECT id FROM roles WHERE "key" = ?', role.key);
       if (!existing) {
@@ -24,7 +30,7 @@ export async function bootstrap() {
         for (const p of role.perms) await run('INSERT INTO role_permissions (role_id, perm_key) VALUES (?, ?)', info.lastInsertRowid, p);
       } else {
         // Existing DB: grant permissions introduced in this version to the system roles that have them by default.
-        for (const p of role.key === 'admin' ? role.perms : role.perms.filter((x) => added.includes(x))) {
+        for (const p of role.key === 'admin' ? role.perms : role.perms.filter((x) => added.includes(x) && !SPLIT_FROM[x])) {
           await insertMissing('role_permissions', ['role_id', 'perm_key'], [existing.id, p]);
         }
       }

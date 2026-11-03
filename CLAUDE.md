@@ -142,6 +142,8 @@ available ──transfer──▶ available (location/department move)
 - Permission keys are fine-grained (`asset.view`, `asset.create`, `asset.transact`, `asset.scrap`, `user.manage`, …). Roles are just bundles editable in UI (`/admin/roles`).
 - Server: `requirePerm('asset.edit')` on every mutating route. Client: `can('asset.edit')` only hides UI.
 - Seeded roles: **Admin** (all), **IT Staff** (all except user/role/settings), **Viewer** (read-only).
+- Menus with their own permission: ยืม-คืน `loan.view`, ประวัติรายการ `history.view`, สแกน QR `scan.use`, พิมพ์สติ๊กเกอร์ `label.print`, พนักงาน `people.view` / `people.manage` (writes to `/api/master/people`; other master tables stay `master.manage`). Their data still comes from asset APIs, so they also need `asset.view`.
+- A permission split out of an older one is listed in `SPLIT_FROM` (`server/permissions.js`); `bootstrap()` grants it to every role holding the older key, so upgrades don't remove access.
 
 ### Auth security
 - Lock account 15 min after 5 failed logins; password ≥ 8 chars with letter + digit; idle session timeout 30 min (sliding); cookie `httpOnly; SameSite=Strict`.

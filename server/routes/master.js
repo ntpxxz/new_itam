@@ -67,7 +67,10 @@ r.get('/:table', requireAuth, async (req, res) => {
   res.json({ rows: await all(sql, ...params) });
 });
 
-r.post('/:table', requirePerm('master.manage'), async (req, res) => {
+// พนักงาน has its own permission; the other master tables use master.manage.
+const canManage = (req, res, next) => requirePerm(req.params.table === 'people' ? 'people.manage' : 'master.manage')(req, res, next);
+
+r.post('/:table', canManage, async (req, res) => {
   const { table } = req.params;
   const def = TABLES[table];
   if (!def) throw notFound('ตาราง');
@@ -81,7 +84,7 @@ r.post('/:table', requirePerm('master.manage'), async (req, res) => {
   res.status(201).json(await get(`SELECT * FROM ${table} WHERE id = ?`, id));
 });
 
-r.put('/:table/:id', requirePerm('master.manage'), async (req, res) => {
+r.put('/:table/:id', canManage, async (req, res) => {
   const { table } = req.params;
   const id = toInt(req.params.id);
   const def = TABLES[table];
@@ -114,7 +117,7 @@ async function softDelete(req, table, before) {
   await audit(req, table, id, 'delete', before, null);
 }
 
-r.delete('/:table/:id', requirePerm('master.manage'), async (req, res) => {
+r.delete('/:table/:id', canManage, async (req, res) => {
   const { table } = req.params;
   const def = TABLES[table];
   if (!def) throw notFound('ตาราง');
@@ -128,7 +131,7 @@ r.delete('/:table/:id', requirePerm('master.manage'), async (req, res) => {
 // Only non-unique fields can be bulk-set (e.g. a person's department).
 const BULK_SET = { people: ['department_id'], locations: ['branch'] };
 
-r.post('/:table/bulk', requirePerm('master.manage'), async (req, res) => {
+r.post('/:table/bulk', canManage, async (req, res) => {
   const { table } = req.params;
   const def = TABLES[table];
   if (!def) throw notFound('ตาราง');

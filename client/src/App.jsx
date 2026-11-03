@@ -79,17 +79,17 @@ export default function App() {
         <Route path="issue" element={g(['asset.transact', 'consumable.move'], <Issue />)} />
         <Route path="documents/:id" element={g(['asset.view', 'consumable.view'], <DocumentDetail />)} />
         <Route path="reports/issues" element={g('report.view', <Reports />)} />
-        <Route path="loans" element={g('asset.view', <Loans />)} />
+        <Route path="loans" element={g('loan.view', <Loans />)} />
         <Route path="consumables" element={<Navigate to="/assets" replace />} />
         <Route path="consumables/:id" element={g('consumable.view', <ConsumableDetail />)} />
         <Route path="consumables/:id/edit" element={g('consumable.manage', <AssetForm />)} />
-        <Route path="history" element={g('asset.view', <HistoryPage />)} />
-        <Route path="scan" element={g('asset.view', <Scan />)} />
-        <Route path="labels" element={g('asset.view', <Labels />)} />
+        <Route path="history" element={g('history.view', <HistoryPage />)} />
+        <Route path="scan" element={g('scan.use', <Scan />)} />
+        <Route path="labels" element={g('label.print', <Labels />)} />
         <Route path="stock-counts" element={g('stockcount.manage', <StockCounts />)} />
         <Route path="stock-counts/:id" element={g('stockcount.manage', <StockCountDetail />)} />
         <Route path="import" element={g('data.import', <ImportPage />)} />
-        <Route path="people" element={g('asset.view', <People />)} />
+        <Route path="people" element={g('people.view', <People />)} />
         <Route path="master" element={g('master.manage', <MasterData />)} />
         <Route path="admin/users" element={g('user.manage', <UsersPage />)} />
         <Route path="admin/roles" element={g('role.manage', <Roles />)} />

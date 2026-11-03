@@ -116,7 +116,7 @@ export default function Assets() {
           {selected.size > 0 && (
             <div className="row">
               <span className="muted" style={{ fontSize: 13 }}>เลือก <span className="mono">{selected.size}</span> รายการ</span>
-              <button className="btn btn-sm" onClick={() => navigate(`/labels?ids=${[...selected].join(',')}`)}><Printer size={14} />พิมพ์สติ๊กเกอร์</button>
+              {can('label.print') && <button className="btn btn-sm" onClick={() => navigate(`/labels?ids=${[...selected].join(',')}`)}><Printer size={14} />พิมพ์สติ๊กเกอร์</button>}
               <button className="btn btn-sm btn-ghost" onClick={() => setSelected(new Set())}>ยกเลิกเลือก</button>
             </div>
           )}
@@ -215,7 +215,7 @@ function AssetRow({ r, can, selected, onToggle, onOpen, onDelete }) {
         <Menu items={[
           { label: 'ดูรายละเอียด', to: `/assets/${r.id}`, icon: <Eye size={15} /> },
           can('asset.edit') && r.status !== 'scrapped' && { label: 'แก้ไข', to: `/assets/${r.id}/edit`, icon: <Pencil size={15} /> },
-          { label: 'พิมพ์สติ๊กเกอร์', to: `/labels?ids=${r.id}`, icon: <Printer size={15} /> },
+          can('label.print') && { label: 'พิมพ์สติ๊กเกอร์', to: `/labels?ids=${r.id}`, icon: <Printer size={15} /> },
           deletable && '-',
           deletable && { label: 'ลบ', onClick: onDelete, icon: <Trash2 size={15} />, danger: true },
         ]} />

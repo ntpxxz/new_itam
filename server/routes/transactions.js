@@ -29,7 +29,7 @@ function where(q) {
 
 const COLS = `t.*, a.asset_tag, a.name AS asset_name, p.name AS person_name, d.name AS department_name, l.name AS location_name, u.full_name AS performed_by_name, doc.doc_no, doc.doc_date`;
 
-r.get('/', requirePerm('asset.view'), async (req, res) => {
+r.get('/', requirePerm('history.view'), async (req, res) => {
   const { page, pageSize, offset } = paging(req);
   const { sql, p } = where(req.query);
   const total = (await get(`SELECT COUNT(*) n ${BASE} WHERE ${sql}`, ...p)).n;

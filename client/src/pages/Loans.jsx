@@ -26,7 +26,7 @@ export default function Loans() {
   return (
     <>
       <PageHeader title="ยืม-คืน" sub="อุปกรณ์ที่อยู่กับพนักงาน ติดตามกำหนดคืนและรับคืนได้จากหน้านี้">
-        <Link to="/scan" className="btn"><ScanLine size={16} />สแกนเพื่อยืม-คืน</Link>
+        {can('scan.use') && <Link to="/scan" className="btn"><ScanLine size={16} />สแกนเพื่อยืม-คืน</Link>}
         {can('asset.transact') && <Link to="/issue?mode=borrow" className="btn btn-primary"><ArrowLeftRight size={16} />ให้ยืมอุปกรณ์</Link>}
       </PageHeader>
 

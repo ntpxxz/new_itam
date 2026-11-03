@@ -56,7 +56,7 @@ export default function AssetDetail() {
     <>
       <PageHeader title={a.name} crumbs={[{ label: 'อุปกรณ์', to: '/assets' }, { label: a.category_name, to: `/assets?category_id=${a.category_id}` }, { label: a.asset_tag }]}>
         <Menu label="การทำงานเพิ่มเติม" buttonClass="icon-btn" items={[
-          { label: 'พิมพ์สติ๊กเกอร์', to: `/labels?ids=${a.id}`, icon: <Printer size={15} /> },
+          can('label.print') && { label: 'พิมพ์สติ๊กเกอร์', to: `/labels?ids=${a.id}`, icon: <Printer size={15} /> },
           can('log.view') && { label: 'ดู Audit Trail', to: `/logs?tab=audit&entity=asset&entity_id=${a.id}`, icon: <ScrollText size={15} /> },
           can('asset.delete') && !['borrowed', 'issued', 'repair'].includes(a.status) && '-',
           can('asset.delete') && !['borrowed', 'issued', 'repair'].includes(a.status) && { label: 'ลบอุปกรณ์', onClick: () => setConfirmDel(true), icon: <Trash2 size={15} />, danger: true },
@@ -188,7 +188,7 @@ export default function AssetDetail() {
             </div>
           </Card>
 
-          <Card title="QR Code" foot={<Link to={`/labels?ids=${a.id}`} className="btn btn-sm btn-block"><Printer size={14} />พิมพ์สติ๊กเกอร์</Link>}>
+          <Card title="QR Code" foot={can('label.print') && <Link to={`/labels?ids=${a.id}`} className="btn btn-sm btn-block"><Printer size={14} />พิมพ์สติ๊กเกอร์</Link>}>
             <div className="qr-box">
               <img src={`/api/assets/${a.id}/qr?origin=${encodeURIComponent(origin)}`} alt={`QR Code ของ ${a.asset_tag}`} />
               <span className="mono" style={{ fontWeight: 600 }}>{a.asset_tag}</span>

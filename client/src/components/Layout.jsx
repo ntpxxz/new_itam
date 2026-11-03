@@ -20,8 +20,8 @@ const NAV = [
       { to: '/receive', label: 'รับเข้า', icon: PackagePlus, perm: ['asset.create', 'consumable.move'] },
       { to: '/pending-receive', label: 'รอรับเข้า', icon: ClipboardList, perm: 'consumable.view', badge: 'pendingReceive' },
       { to: '/issue', label: 'เบิกออก', icon: PackageMinus, perm: ['asset.transact', 'consumable.move'] },
-      { to: '/loans', label: 'ยืม-คืน', icon: ArrowLeftRight, perm: 'asset.view', badge: 'overdue' },
-      { to: '/history', label: 'ประวัติรายการ', icon: History, perm: 'asset.view' },
+      { to: '/loans', label: 'ยืม-คืน', icon: ArrowLeftRight, perm: 'loan.view', badge: 'overdue' },
+      { to: '/history', label: 'ประวัติรายการ', icon: History, perm: 'history.view' },
     ],
   },
   {
@@ -31,8 +31,8 @@ const NAV = [
   {
     label: 'เครื่องมือ',
     items: [
-      { to: '/scan', label: 'สแกน QR', icon: ScanLine, perm: 'asset.view' },
-      { to: '/labels', label: 'พิมพ์สติ๊กเกอร์', icon: Printer, perm: 'asset.view' },
+      { to: '/scan', label: 'สแกน QR', icon: ScanLine, perm: 'scan.use' },
+      { to: '/labels', label: 'พิมพ์สติ๊กเกอร์', icon: Printer, perm: 'label.print' },
       { to: '/stock-counts', label: 'ตรวจนับ', icon: ClipboardCheck, perm: 'stockcount.manage' },
       { to: '/import', label: 'นำเข้า Excel', icon: FileSpreadsheet, perm: 'data.import' },
     ],
@@ -40,7 +40,7 @@ const NAV = [
   {
     label: 'ตั้งค่า',
     items: [
-      { to: '/people', label: 'พนักงาน', icon: Users, perm: 'asset.view' },
+      { to: '/people', label: 'พนักงาน', icon: Users, perm: 'people.view' },
       { to: '/master', label: 'ข้อมูลหลัก', icon: Database, perm: 'master.manage' },
       { to: '/admin/users', label: 'ผู้ใช้งาน', icon: UserCog, perm: 'user.manage' },
       { to: '/admin/roles', label: 'บทบาทและสิทธิ์', icon: ShieldCheck, perm: 'role.manage' },

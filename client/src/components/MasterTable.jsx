@@ -17,7 +17,7 @@ export default function MasterTable({ table, title, columns, addLabel = 'เพ�
   const { data, loading, reload } = useApi(`/api/master/${table}`, { ...extraParams, q: dq });
   const [editing, setEditing] = useState(null);
   const [del, setDel] = useState(null);
-  const manage = can('master.manage');
+  const manage = can(table === 'people' ? 'people.manage' : 'master.manage');
   const [selected, setSelected] = useState(new Set());
   const [bulk, setBulk] = useState(null); // 'delete' | 'set'
   const checks = selectable && manage;
