@@ -9,12 +9,13 @@ import { createReceiveDoc } from './documents.js';
 // Uploading never touches stock; receiving creates a normal RCV slip via createReceiveDoc(), so stock,
 // history and audit follow the same rules as the รับเข้า page. Lines match items by SKU at read time.
 // Incomplete lines (no SKU / quantity) are kept too, so they can be fixed on the page instead of re-uploading.
+// ลบ = soft delete (deleted_at): the line disappears from every tab; received lines belong to a slip and stay.
 const r = Router();
 
 const MATCH = `
   LEFT JOIN consumables x ON x.sku = p.sku COLLATE NOCASE AND x.deleted_at IS NULL`;
 const LIST = `
-  SELECT p.id, p.batch_id, p.line_no, p.sku, p.name, p.qty, p.unit_cost, p.status, p.doc_id, p.created_at, p.closed_at,
+  SELECT p.id, p.batch_id, p.line_no, p.sku, p.name, p.qty, p.unit_cost, p.status, p.doc_id, p.created_at, p.closed_at, p.deleted_at,
          b.file_name, b.note AS batch_note, u.full_name AS created_by_name, cu.full_name AS closed_by_name, d.doc_no,
          x.id AS item_id, x.name AS item_name, x.unit, x.qty_on_hand, x.unit_cost AS item_unit_cost,
          CASE WHEN x.id IS NULL AND EXISTS (SELECT 1 FROM assets a WHERE (a.asset_tag = p.sku COLLATE NOCASE OR a.serial_no = p.sku) AND a.deleted_at IS NULL)
@@ -43,13 +44,13 @@ const idList = (ids) => [...new Set((Array.isArray(ids) ? ids : []).map(Number).
 
 r.get('/', requirePerm('consumable.view'), async (req, res) => {
   const status = STATUSES.includes(req.query.status) ? req.query.status : 'pending';
-  const w = ['p.status = ?']; const p = [status];
+  const w = ['p.status = ?', 'p.deleted_at IS NULL']; const p = [status];
   if (req.query.q) {
     w.push(`(p.sku LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR x.name LIKE ? ESCAPE '\\' OR b.file_name LIKE ? ESCAPE '\\')`);
     p.push(...Array(4).fill(likeTerm(req.query.q)));
   }
   const rows = (await all(`${LIST} WHERE ${w.join(' AND ')} ORDER BY p.batch_id DESC, p.line_no, p.id LIMIT 2000`, ...p)).map(withState);
-  const counts = Object.fromEntries((await all('SELECT status, COUNT(*) n FROM pending_receipts GROUP BY status')).map((c) => [c.status, c.n]));
+  const counts = Object.fromEntries((await all('SELECT status, COUNT(*) n FROM pending_receipts WHERE deleted_at IS NULL GROUP BY status')).map((c) => [c.status, c.n]));
   res.json({ rows, counts });
 });
 
@@ -90,7 +91,7 @@ r.post('/upload', requirePerm('consumable.move'), async (req, res) => {
 });
 
 r.put('/:id', requirePerm('consumable.move'), async (req, res) => {
-  const before = await get('SELECT * FROM pending_receipts WHERE id = ?', toInt(req.params.id));
+  const before = await get('SELECT * FROM pending_receipts WHERE id = ? AND deleted_at IS NULL', toInt(req.params.id));
   if (!before) throw notFound('รายการรอรับเข้า');
   if (before.status !== 'pending') throw bad('รายการนี้รับเข้าหรือยกเลิกไปแล้ว แก้ไขไม่ได้');
   const body = req.body || {};
@@ -121,7 +122,7 @@ async function loadPending(ids) {
   if (!ids.length) throw bad('กรุณาเลือกอย่างน้อย 1 รายการ');
   if (ids.length > 500) throw bad('เลือกได้ครั้งละไม่เกิน 500 รายการ');
   const rows = await all(`${LIST} WHERE p.id IN (${ids.map(() => '?').join(',')}) ORDER BY p.batch_id, p.line_no, p.id`, ...ids);
-  if (rows.length !== ids.length || rows.some((x) => x.status !== 'pending')) {
+  if (rows.length !== ids.length || rows.some((x) => x.status !== 'pending' || x.deleted_at)) {
     throw bad('บางรายการถูกรับเข้าหรือยกเลิกไปแล้ว — โหลดหน้าใหม่แล้วลองอีกครั้ง');
   }
   return rows.map(withState);
@@ -162,6 +163,21 @@ r.post('/cancel', requirePerm('consumable.move'), async (req, res) => {
     await run(`UPDATE pending_receipts SET status = 'cancelled', closed_by = ?, closed_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
       req.user.id, now(), ...ids);
     await audit(req, 'pending_receipt', null, 'cancel', null, { ids, reason: req.body?.reason || null });
+  });
+  res.json({ ok: true, count: ids.length });
+});
+
+// body: { ids } — pending or cancelled lines only
+r.post('/delete', requirePerm('consumable.move'), async (req, res) => {
+  const ids = idList(req.body?.ids);
+  if (!ids.length) throw bad('กรุณาเลือกอย่างน้อย 1 รายการ');
+  if (ids.length > 500) throw bad('เลือกได้ครั้งละไม่เกิน 500 รายการ');
+  await tx(async () => {
+    const rows = await all(`SELECT id, status, sku, qty FROM pending_receipts WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`, ...ids);
+    if (rows.length !== ids.length) throw bad('บางรายการถูกลบไปแล้ว — โหลดหน้าใหม่แล้วลองอีกครั้ง');
+    if (rows.some((x) => x.status === 'received')) throw bad('รายการที่รับเข้าแล้วลบไม่ได้ — อยู่ในใบรับเข้าแล้ว');
+    await run(`UPDATE pending_receipts SET deleted_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`, now(), ...ids);
+    for (const x of rows) await audit(req, 'pending_receipt', x.id, 'delete', x, null);
   });
   res.json({ ok: true, count: ids.length });
 });

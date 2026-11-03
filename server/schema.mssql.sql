@@ -252,7 +252,8 @@ CREATE TABLE pending_receipts (
   created_by INT NULL REFERENCES users(id),
   created_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
   closed_by  INT NULL REFERENCES users(id),
-  closed_at  DATETIME2(0) NULL
+  closed_at  DATETIME2(0) NULL,
+  deleted_at DATETIME2(0) NULL
 );
 
 IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NULL
@@ -302,6 +303,9 @@ BEGIN
   ALTER TABLE pending_receipts ADD CHECK (qty > 0);
   ALTER TABLE pending_receipts ALTER COLUMN sku NVARCHAR(64) NULL;
 END
+GO
+
+IF COL_LENGTH(N'dbo.pending_receipts', N'deleted_at') IS NULL ALTER TABLE pending_receipts ADD deleted_at DATETIME2(0) NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_pending_status') CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);

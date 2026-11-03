@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ClipboardList, FileUp, Download, AlertTriangle, PackageCheck, PackagePlus, Search, XCircle } from 'lucide-react';
+import { ClipboardList, FileUp, Download, AlertTriangle, PackageCheck, PackagePlus, Search, Trash2, XCircle } from 'lucide-react';
 import { api } from '../api.js';
 import { useLookup } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
@@ -27,6 +27,7 @@ export default function PendingReceive() {
   const [creating, setCreating] = useState(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [deleting, setDeleting] = useState(null);
 
   const load = () => api.get('/api/pending-receipts', { status, q }).then(setData).catch((e) => toast.error(e));
   useEffect(() => { setData(null); setPicked(new Set()); load(); }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -75,7 +76,17 @@ export default function PendingReceive() {
     } catch (e) { toast.error(e); }
   };
 
+  const remove = async () => {
+    try {
+      await api.post('/api/pending-receipts/delete', { ids: deleting.map((r) => r.id) });
+      toast.success(`ลบ ${deleting.length} รายการแล้ว`);
+      setPicked(new Set());
+      load();
+    } catch (e) { toast.error(e); }
+  };
+
   const counts = data?.counts || {};
+  const canDelete = canMove && status !== 'received';
   const edit = pending && canMove;
   return (
     <>
@@ -157,6 +168,7 @@ export default function PendingReceive() {
                     <th className="text-right">จำนวน</th>
                     <th className="text-right">ราคา/หน่วย</th>
                     <th>สถานะ</th>
+                    {canDelete && <th style={{ width: 44 }}><span className="sr-only">ลบ</span></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -222,6 +234,13 @@ export default function PendingReceive() {
                           </div>
                         )}
                       </td>
+                      {canDelete && (
+                        <td>
+                          <button className="icon-btn plain" onClick={() => setDeleting([r])} aria-label={`ลบ ${r.item_name || r.name || r.sku || `แถว ${r.line_no ?? ''}`}`} title="ลบ">
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -235,6 +254,7 @@ export default function PendingReceive() {
                 {' '}· รวม <strong className="mono">{fmtNum(chosenReady.reduce((s, r) => s + r.qty, 0))}</strong> หน่วย</span>
               <span className="spacer" />
               <button className="btn btn-sm btn-ghost" onClick={() => setCancelOpen(true)}><XCircle size={14} />ยกเลิกรายการที่เลือก</button>
+              <button className="btn btn-sm btn-ghost" onClick={() => setDeleting(chosen)}><Trash2 size={14} />ลบรายการที่เลือก</button>
             </div>
           )}
         </div>
@@ -243,6 +263,13 @@ export default function PendingReceive() {
       {receiveOpen && (
         <ReceiveDialog rows={chosenReady} skipped={chosen.length - chosenReady.length} onClose={() => setReceiveOpen(false)}
           onDone={(doc) => { toast.success(`บันทึกใบรับเข้า ${doc.doc_no} แล้ว — อัปเดตสต็อกเรียบร้อย`); navigate(`/documents/${doc.id}`); }} />
+      )}
+      {deleting && (
+        <Confirm title="ลบรายการรอรับเข้า" danger confirmLabel={`ลบ ${deleting.length} รายการ`}
+          message={deleting.length === 1
+            ? `ลบ “${deleting[0].item_name || deleting[0].name || deleting[0].sku || `แถว ${deleting[0].line_no ?? ''}`}” ออกจากรายการ — สต็อกไม่เปลี่ยน`
+            : `ลบ ${deleting.length} รายการที่เลือกออกจากรายการ — สต็อกไม่เปลี่ยน`}
+          onConfirm={remove} onClose={() => setDeleting(null)} />
       )}
       {creating && (
         <NewItemDialog line={creating} onClose={() => setCreating(null)}

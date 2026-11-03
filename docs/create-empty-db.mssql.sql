@@ -248,7 +248,8 @@ CREATE TABLE pending_receipts (
   created_by INT NULL REFERENCES users(id),
   created_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
   closed_by  INT NULL REFERENCES users(id),
-  closed_at  DATETIME2(0) NULL
+  closed_at  DATETIME2(0) NULL,
+  deleted_at DATETIME2(0) NULL
 );
 
 CREATE TABLE audit_logs (

@@ -160,7 +160,8 @@ CREATE TABLE pending_receipts (
   created_by  INTEGER REFERENCES users(id),
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   closed_by   INTEGER REFERENCES users(id),
-  closed_at   TEXT
+  closed_at   TEXT,
+  deleted_at  TEXT
 );
 
 CREATE TABLE people (
