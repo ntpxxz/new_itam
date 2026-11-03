@@ -79,34 +79,6 @@ r.post('/receive', requirePerm('asset.create', 'consumable.move'), async (req, r
   res.status(201).json(result);
 });
 
-// CSV import on รับเข้า: match each parsed row (sku, name, qty, unit_cost) to an existing consumable.
-// Read-only — the client shows the result for review, then adds the matched rows to the slip as normal lines.
-// status: ok | new (SKU not in the system yet — create the item first) | error (cannot be received)
-r.post('/receive/check', requirePerm('consumable.move'), async (req, res) => {
-  const rows = Array.isArray(req.body?.rows) ? req.body.rows.slice(0, 1000) : [];
-  if (!rows.length) throw bad('ไม่พบรายการในไฟล์ — ตรวจสอบว่ามีคอลัมน์ บาร์โค้ด/SKU และ จำนวน');
-  const out = [];
-  for (const row of rows) {
-    const sku = String(row.sku ?? '').trim();
-    const qty = Number(row.qty);
-    const base = { line: row.line, sku, name: String(row.name ?? '').trim(), qty: row.qty, unit_cost: row.unit_cost ?? null };
-    if (!sku) { out.push({ ...base, status: 'error', problem: 'ไม่มีบาร์โค้ด/SKU' }); continue; }
-    if (!Number.isInteger(qty) || qty <= 0) { out.push({ ...base, status: 'error', problem: 'จำนวนต้องเป็นจำนวนเต็มที่มากกว่า 0' }); continue; }
-    const item = await get(`SELECT id, sku, name, unit, qty_on_hand, unit_cost, deleted_at FROM consumables WHERE sku = ? COLLATE NOCASE`, sku);
-    if (item && !item.deleted_at) {
-      const { deleted_at, ...match } = item;
-      out.push({ ...base, status: 'ok', item: match, nameDiffers: !!base.name && base.name.toLowerCase() !== item.name.toLowerCase() });
-    } else if (item) {
-      out.push({ ...base, status: 'error', problem: `SKU นี้เป็นของรายการที่ลบไปแล้ว (${item.name})` });
-    } else if (await get('SELECT 1 AS x FROM assets WHERE (asset_tag = ? COLLATE NOCASE OR serial_no = ?) AND deleted_at IS NULL', sku, sku)) {
-      out.push({ ...base, status: 'error', problem: 'เป็นอุปกรณ์รายชิ้นที่มีอยู่แล้ว — รับเข้าซ้ำไม่ได้' });
-    } else {
-      out.push({ ...base, status: 'new' });
-    }
-  }
-  res.json({ rows: out });
-});
-
 // A backdated issue must not predate the asset's receipt or its latest movement.
 async function checkNotBeforeHistory(assetId, docDate) {
   const a = await get('SELECT asset_tag, received_date FROM assets WHERE id = ?', toInt(assetId));
