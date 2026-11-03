@@ -227,6 +227,30 @@ CREATE TABLE stock_count_scans (
   UNIQUE (count_id, raw_code)
 );
 
+CREATE TABLE pending_batches (
+  id         INT IDENTITY(1,1) PRIMARY KEY,
+  file_name  NVARCHAR(260) NULL,
+  note       NVARCHAR(MAX) NULL,
+  created_by INT NULL REFERENCES users(id),
+  created_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE pending_receipts (
+  id         INT IDENTITY(1,1) PRIMARY KEY,
+  batch_id   INT NOT NULL REFERENCES pending_batches(id),
+  line_no    INT NULL,
+  sku        NVARCHAR(64) NULL,
+  name       NVARCHAR(300) NULL,
+  qty        INT NULL CHECK (qty > 0),
+  unit_cost  DECIMAL(14,2) NULL,
+  status     NVARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','received','cancelled')),
+  doc_id     INT NULL REFERENCES documents(id),
+  created_by INT NULL REFERENCES users(id),
+  created_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
+  closed_by  INT NULL REFERENCES users(id),
+  closed_at  DATETIME2(0) NULL
+);
+
 CREATE TABLE audit_logs (
   id          INT IDENTITY(1,1) PRIMARY KEY,
   user_id     INT NULL,
@@ -262,6 +286,7 @@ CREATE INDEX idx_audit_entity   ON audit_logs(entity, entity_id);
 CREATE INDEX idx_docs_type      ON documents(type, doc_date);
 CREATE INDEX idx_sm_cons        ON stock_movements(consumable_id, created_at);
 CREATE INDEX idx_sm_doc         ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;
+CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);
 
 -- REFERENCE DATA (permissions, system roles, default settings)
 

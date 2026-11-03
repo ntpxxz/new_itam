@@ -25,6 +25,7 @@ import Logs from './pages/Logs.jsx';
 import SettingsPage from './pages/Settings.jsx';
 import Profile from './pages/Profile.jsx';
 import Receive from './pages/Receive.jsx';
+import PendingReceive from './pages/PendingReceive.jsx';
 import Issue from './pages/Issue.jsx';
 import DocumentDetail from './pages/DocumentDetail.jsx';
 import Reports from './pages/Reports.jsx';
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="assets/:id/edit" element={g('asset.edit', <AssetForm />)} />
         <Route path="a/:tag" element={g('asset.view', <TagRedirect />)} />
         <Route path="receive" element={g(['asset.create', 'consumable.move'], <Receive />)} />
+        <Route path="pending-receive" element={g('consumable.view', <PendingReceive />)} />
         <Route path="issue" element={g(['asset.transact', 'consumable.move'], <Issue />)} />
         <Route path="documents/:id" element={g(['asset.view', 'consumable.view'], <DocumentDetail />)} />
         <Route path="reports/issues" element={g('report.view', <Reports />)} />

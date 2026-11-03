@@ -100,6 +100,11 @@ available ──transfer──▶ available (location/department move)
 - Issue date (`doc_date`) may be backdated: not in the future, and for each asset not before its `received_date` or latest movement. Borrow due date must be ≥ `doc_date`. History rows keep `created_at` as the record time; the effective date comes from `documents.doc_date` (shown as วันที่ … · บันทึก …).
 - Always reuse `applyAction` / `createAsset` / `moveStock` so rules, history and audit stay in one place.
 
+### รายการรอรับเข้า (pending receipts) — `server/routes/pending.js` (`/api/pending-receipts`), page `/pending-receive`
+- Upload a CSV (browser parses it in `client/src/csv.js`: Barcode/SKU + Quantity required; Name, Unit Price optional; UTF-8/UTF-16/Windows-874) → rows are stored in `pending_batches` / `pending_receipts` (status `pending`). **Uploading never changes stock.**
+- Every non-empty row is kept. Each line's `state` is computed when listed: `ready` (SKU matches a consumable) · `new` (SKU not in the system → "สร้างรายการใหม่" dialog on the page creates the consumable with stock 0, or the full form `/assets/new?sku=&name=&unit_cost=`) · `incomplete` (no SKU, SKU with spaces, no qty, or an existing per-unit asset; `problem` says why). SKU/qty/price are edited in the row; only `ready` lines can be received.
+- Anyone with `consumable.move` can come back later, tick ready lines and receive them: one RCV slip via `createReceiveDoc()` (shared with `/receive`), then the lines become `received` with `doc_id`, in the same transaction. Lines can be edited (SKU/qty/price) or `cancelled` while pending — never deleted. Sidebar badge `pendingReceive`.
+
 ### Recipients: free text name + แผนก — `server/recipient.js`
 - Borrow / issue / transfer / stock-out take **typed** `person_name`, `department_name` (UI: `RecipientFields`, inputs with datalist suggestions — no dropdowns).
 - **Name is optional.** A recipient needs a name **or** a department (แผนก) — issuing to a department as a whole leaves `holder_person_id` NULL. Stock-out from the item page needs neither.

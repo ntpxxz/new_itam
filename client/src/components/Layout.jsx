@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-do
 import {
   LayoutDashboard, Laptop, ArrowLeftRight, History, PackagePlus, PackageMinus, BarChart3, ScanLine, Printer, ClipboardCheck, FileSpreadsheet,
   Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, Search, Bell, LogOut, KeyRound, Boxes,
-  AlertTriangle, PackageX,
+  AlertTriangle, PackageX, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
@@ -18,6 +18,7 @@ const NAV = [
     items: [
       { to: '/assets', label: 'อุปกรณ์', icon: Laptop, perm: ['asset.view', 'consumable.view'], badge: 'lowStock' },
       { to: '/receive', label: 'รับเข้า', icon: PackagePlus, perm: ['asset.create', 'consumable.move'] },
+      { to: '/pending-receive', label: 'รอรับเข้า', icon: ClipboardList, perm: 'consumable.view', badge: 'pendingReceive' },
       { to: '/issue', label: 'เบิกออก', icon: PackageMinus, perm: ['asset.transact', 'consumable.move'] },
       { to: '/loans', label: 'ยืม-คืน', icon: ArrowLeftRight, perm: 'asset.view', badge: 'overdue' },
       { to: '/history', label: 'ประวัติรายการ', icon: History, perm: 'asset.view' },
@@ -52,7 +53,7 @@ const NAV = [
 export default function Layout() {
   const { user, can, logout } = useAuth();
   const [open, setOpen] = useState(false);
-  const [badges, setBadges] = useState({ overdue: 0, lowStock: 0 });
+  const [badges, setBadges] = useState({ overdue: 0, lowStock: 0, pendingReceive: 0 });
   const [q, setQ] = useState('');
   const searchRef = useRef(null);
   const loc = useLocation();
@@ -106,7 +107,7 @@ export default function Layout() {
                     <span>{i.label}</span>
                     {i.badge && badges[i.badge] > 0 && (
                       <span className={`nav-badge${i.badge === 'lowStock' ? ' warn' : ''}`}
-                        aria-label={i.badge === 'overdue' ? `เกินกำหนดคืน ${badges.overdue} รายการ` : `สต็อกต่ำ ${badges.lowStock} รายการ`}>
+                        aria-label={{ overdue: `เกินกำหนดคืน ${badges.overdue} รายการ`, lowStock: `สต็อกต่ำ ${badges.lowStock} รายการ`, pendingReceive: `รอรับเข้า ${badges.pendingReceive} รายการ` }[i.badge]}>
                         {badges[i.badge]}
                       </span>
                     )}

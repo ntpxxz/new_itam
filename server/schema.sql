@@ -216,6 +216,34 @@ CREATE TABLE IF NOT EXISTS stock_count_scans (
   UNIQUE (count_id, raw_code)
 );
 
+-- รายการรอรับเข้า: lines uploaded from a file, received later into a normal RCV slip.
+-- The item is matched by SKU when listed, so creating a missing item makes its line ready.
+-- sku / qty are NULL on an incomplete line until someone fixes it on the page.
+CREATE TABLE IF NOT EXISTS pending_batches (
+  id          INTEGER PRIMARY KEY,
+  file_name   TEXT,
+  note        TEXT,
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS pending_receipts (
+  id          INTEGER PRIMARY KEY,
+  batch_id    INTEGER NOT NULL REFERENCES pending_batches(id),
+  line_no     INTEGER,
+  sku         TEXT,
+  name        TEXT,
+  qty         INTEGER CHECK (qty > 0),
+  unit_cost   REAL,
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','received','cancelled')),
+  doc_id      INTEGER REFERENCES documents(id),
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  closed_by   INTEGER REFERENCES users(id),
+  closed_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_receipts(status, batch_id);
+
 CREATE TABLE IF NOT EXISTS access_logs (
   id         INTEGER PRIMARY KEY,
   user_id    INTEGER,

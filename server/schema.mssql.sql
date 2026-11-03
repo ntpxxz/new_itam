@@ -229,6 +229,32 @@ CREATE TABLE stock_count_scans (
   UNIQUE (count_id, raw_code)
 );
 
+IF OBJECT_ID(N'dbo.pending_batches', N'U') IS NULL
+CREATE TABLE pending_batches (
+  id         INT IDENTITY(1,1) PRIMARY KEY,
+  file_name  NVARCHAR(260) NULL,
+  note       NVARCHAR(MAX) NULL,
+  created_by INT NULL REFERENCES users(id),
+  created_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+IF OBJECT_ID(N'dbo.pending_receipts', N'U') IS NULL
+CREATE TABLE pending_receipts (
+  id         INT IDENTITY(1,1) PRIMARY KEY,
+  batch_id   INT NOT NULL REFERENCES pending_batches(id),
+  line_no    INT NULL,
+  sku        NVARCHAR(64) NULL,
+  name       NVARCHAR(300) NULL,
+  qty        INT NULL CHECK (qty > 0),
+  unit_cost  DECIMAL(14,2) NULL,
+  status     NVARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','received','cancelled')),
+  doc_id     INT NULL REFERENCES documents(id),
+  created_by INT NULL REFERENCES users(id),
+  created_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
+  closed_by  INT NULL REFERENCES users(id),
+  closed_at  DATETIME2(0) NULL
+);
+
 IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NULL
 CREATE TABLE audit_logs (
   id          INT IDENTITY(1,1) PRIMARY KEY,
@@ -264,6 +290,21 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_audit_entity')   CREA
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_docs_type')      CREATE INDEX idx_docs_type      ON documents(type, doc_date);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_sm_cons')        CREATE INDEX idx_sm_cons        ON stock_movements(consumable_id, created_at);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_sm_doc')         CREATE INDEX idx_sm_doc         ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.pending_receipts') AND name = N'qty' AND is_nullable = 0)
+BEGIN
+  DECLARE @ck NVARCHAR(256), @drop NVARCHAR(400);
+  SELECT @ck = cc.name FROM sys.check_constraints cc
+    JOIN sys.columns c ON c.object_id = cc.parent_object_id AND c.column_id = cc.parent_column_id
+    WHERE cc.parent_object_id = OBJECT_ID(N'dbo.pending_receipts') AND c.name = N'qty';
+  SET @drop = N'ALTER TABLE pending_receipts DROP CONSTRAINT ' + QUOTENAME(@ck);
+  IF @ck IS NOT NULL EXEC sp_executesql @drop;
+  ALTER TABLE pending_receipts ALTER COLUMN qty INT NULL;
+  ALTER TABLE pending_receipts ADD CHECK (qty > 0);
+  ALTER TABLE pending_receipts ALTER COLUMN sku NVARCHAR(64) NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_pending_status') CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);
 GO
 
 -- Append-only logs and history (deleting log rows is allowed only past settings.log_retention_days).

@@ -139,6 +139,30 @@ CREATE TABLE locations (
   deleted_at TEXT
 );
 
+CREATE TABLE pending_batches (
+  id          INTEGER PRIMARY KEY,
+  file_name   TEXT,
+  note        TEXT,
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE pending_receipts (
+  id          INTEGER PRIMARY KEY,
+  batch_id    INTEGER NOT NULL REFERENCES pending_batches(id),
+  line_no     INTEGER,
+  sku         TEXT,
+  name        TEXT,
+  qty         INTEGER CHECK (qty > 0),
+  unit_cost   REAL,
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','received','cancelled')),
+  doc_id      INTEGER REFERENCES documents(id),
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  closed_by   INTEGER REFERENCES users(id),
+  closed_at   TEXT
+);
+
 CREATE TABLE people (
   id            INTEGER PRIMARY KEY,
   name          TEXT NOT NULL,
@@ -252,6 +276,7 @@ CREATE INDEX idx_atx_doc ON asset_transactions(doc_id) WHERE doc_id IS NOT NULL;
 CREATE INDEX idx_audit_created ON audit_logs(created_at);
 CREATE INDEX idx_audit_entity ON audit_logs(entity, entity_id);
 CREATE INDEX idx_docs_type ON documents(type, doc_date);
+CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);
 CREATE INDEX idx_sm_cons ON stock_movements(consumable_id, created_at);
 CREATE INDEX idx_sm_doc ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;
 

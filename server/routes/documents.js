@@ -27,7 +27,11 @@ function checkDocDate(d) {
 
 /* ---------- receive ---------- */
 r.post('/receive', requirePerm('asset.create', 'consumable.move'), async (req, res) => {
-  const b = req.body || {};
+  res.status(201).json(await createReceiveDoc(req, req.body || {}));
+});
+
+// Also used by รายการรอรับเข้า (pending.js), inside its own transaction.
+export async function createReceiveDoc(req, b) {
   const lines = Array.isArray(b.lines) ? b.lines : [];
   if (!lines.length) throw bad('กรุณาเพิ่มอย่างน้อย 1 รายการ');
   const doc_date = checkDocDate(b.doc_date);
@@ -35,7 +39,7 @@ r.post('/receive', requirePerm('asset.create', 'consumable.move'), async (req, r
   const location_id = toInt(b.location_id);
   const vendor_id = toInt(b.vendor_id);
 
-  const result = await tx(async () => {
+  return tx(async () => {
     const doc_no = await nextDocNo('receive', doc_date);
     const docId = Number((await run(`INSERT INTO documents (doc_no, type, doc_date, location_id, vendor_id, po_number, invoice_number, note, created_by)
       VALUES (?, 'receive', ?, ?, ?, ?, ?, ?, ?)`, doc_no, doc_date, location_id, vendor_id, b.po_number, b.invoice_number, b.note, req.user.id)).lastInsertRowid);
@@ -76,8 +80,7 @@ r.post('/receive', requirePerm('asset.create', 'consumable.move'), async (req, r
     await audit(req, 'document', docId, 'receive', null, { doc_no, lines: lines.length, assets, units });
     return { id: docId, doc_no, assets, units };
   });
-  res.status(201).json(result);
-});
+}
 
 // A backdated issue must not predate the asset's receipt or its latest movement.
 async function checkNotBeforeHistory(assetId, docDate) {

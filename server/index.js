@@ -17,6 +17,7 @@ import adminRoutes from './routes/admin.js';
 import stockCountRoutes from './routes/stockcount.js';
 import itemRoutes from './routes/items.js';
 import documentRoutes from './routes/documents.js';
+import pendingRoutes from './routes/pending.js';
 import reportRoutes from './routes/reports.js';
 import assistantRoutes from './routes/assistant.js';
 
@@ -61,6 +62,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/master', masterRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/pending-receipts', pendingRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/assets', assetRoutes);
