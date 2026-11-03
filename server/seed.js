@@ -1,17 +1,21 @@
-// Wipes data/it_storage.db and fills it with realistic demo data.
+// Wipes the database (data/it_storage.db, or every table when DB_CLIENT=mssql) and fills it with realistic demo data.
 import './env.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dbFile = process.env.DB_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'it_storage.db');
-for (const f of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) fs.rmSync(f, { force: true });
+const mssql = String(process.env.DB_CLIENT || '').toLowerCase() === 'mssql';
+if (!mssql) {
+  const dbFile = process.env.DB_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'it_storage.db');
+  for (const f of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) fs.rmSync(f, { force: true });
+}
 
-const { run, get, tx } = await import('./db.js');
+const { run, get, tx, dateOf, resetMssql, closeDb } = await import('./db.js');
 const { bootstrap, roleId } = await import('./bootstrap.js');
 const { hashPassword } = await import('./auth.js');
 
-bootstrap();
+if (mssql) await resetMssql();
+await bootstrap();
 
 let seed = 42;
 const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -21,32 +25,36 @@ const iso = (d) => d.toISOString().slice(0, 10);
 const ts = (d) => d.toISOString().replace('T', ' ').slice(0, 19);
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
-tx(() => {
-  const ids = (table, rows, cols) => rows.map((r) => Number(run(`INSERT INTO ${table} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, ...r).lastInsertRowid));
+await tx(async () => {
+  const ids = async (table, rows, cols) => {
+    const out = [];
+    for (const r of rows) out.push(Number((await run(`INSERT INTO ${table} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, ...r)).lastInsertRowid));
+    return out;
+  };
 
-  run('UPDATE users SET full_name = ? WHERE username = ?', 'สมชาย ผู้ดูแลระบบ', 'admin');
-  run('INSERT INTO users (username, password_hash, full_name, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?)',
-    'staff', hashPassword('Staff@1234'), 'วิภา เจ้าหน้าที่ไอที', roleId('it_staff'), ts(new Date()));
-  run('INSERT INTO users (username, password_hash, full_name, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?)',
-    'viewer', hashPassword('Viewer@1234'), 'กิตติ ผู้ตรวจสอบ', roleId('viewer'), ts(new Date()));
-  const staffId = get(`SELECT id FROM users WHERE username='staff'`).id;
-  const adminId = get(`SELECT id FROM users WHERE username='admin'`).id;
+  await run('UPDATE users SET full_name = ? WHERE username = ?', 'สมชาย ผู้ดูแลระบบ', 'admin');
+  await run('INSERT INTO users (username, password_hash, full_name, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?)',
+    'staff', hashPassword('Staff@1234'), 'วิภา เจ้าหน้าที่ไอที', await roleId('it_staff'), ts(new Date()));
+  await run('INSERT INTO users (username, password_hash, full_name, role_id, password_changed_at) VALUES (?, ?, ?, ?, ?)',
+    'viewer', hashPassword('Viewer@1234'), 'กิตติ ผู้ตรวจสอบ', await roleId('viewer'), ts(new Date()));
+  const staffId = (await get(`SELECT id FROM users WHERE username='staff'`)).id;
+  const adminId = (await get(`SELECT id FROM users WHERE username='admin'`)).id;
   const actors = [adminId, staffId, staffId];
 
-  const depts = ids('departments', [['ไอที'], ['บัญชีและการเงิน'], ['ฝ่ายขาย'], ['ทรัพยากรบุคคล'], ['การตลาด'], ['ปฏิบัติการ']], ['name']);
-  const locs = ids('locations', [
+  const depts = await ids('departments', [['ไอที'], ['บัญชีและการเงิน'], ['ฝ่ายขาย'], ['ทรัพยากรบุคคล'], ['การตลาด'], ['ปฏิบัติการ']], ['name']);
+  const locs = await ids('locations', [
     ['คลัง IT ชั้น 3', 'สำนักงานใหญ่'], ['ห้อง Server', 'สำนักงานใหญ่'], ['ชั้น 5 โซน A', 'สำนักงานใหญ่'],
     ['สาขาเชียงใหม่', 'เชียงใหม่'], ['สาขาภูเก็ต', 'ภูเก็ต'],
   ], ['name', 'branch']);
-  const vendors = ids('vendors', [
+  const vendors = await ids('vendors', [
     ['Advice IT', 'คุณนพ', '02-111-2222', 'sales@advice.example'], ['JIB Computer', 'คุณแอน', '02-333-4444', 'b2b@jib.example'],
     ['Synnex Thailand', 'คุณต้น', '02-555-6666', 'corp@synnex.example'], ['Office Mate', 'คุณปุ้ย', '02-777-8888', 'b2b@officemate.example'],
   ], ['name', 'contact', 'phone', 'email']);
-  const assetCats = ids('categories', [
+  const assetCats = await ids('categories', [
     ['โน้ตบุ๊ก', 'asset', 'NB'], ['คอมพิวเตอร์ตั้งโต๊ะ', 'asset', 'PC'], ['จอภาพ', 'asset', 'MON'], ['เครื่องพิมพ์', 'asset', 'PRT'],
     ['อุปกรณ์เครือข่าย', 'asset', 'NET'], ['แท็บเล็ต', 'asset', 'TAB'], ['โปรเจกเตอร์', 'asset', 'PJ'],
   ], ['name', 'kind', 'prefix']);
-  const consCats = ids('categories', [
+  const consCats = await ids('categories', [
     ['เมาส์และคีย์บอร์ด', 'consumable', 'MSE'], ['สายสัญญาณ', 'consumable', 'CBL'], ['หมึกพิมพ์', 'consumable', 'INK'],
     ['อุปกรณ์จัดเก็บข้อมูล', 'consumable', 'USB'], ['อุปกรณ์เสริม', 'consumable', 'ACC'],
   ], ['name', 'kind', 'prefix']);
@@ -54,7 +62,7 @@ tx(() => {
   const names = ['ณัฐพล ศรีสุข', 'กมลวรรณ ทองดี', 'ปิยะพงษ์ แก้วมณี', 'สุภาวดี จันทร์เพ็ญ', 'ธนากร วงศ์ใหญ่', 'อรุณี สายทอง', 'วีรยุทธ บุญมา',
     'ชลธิชา พรหมมา', 'อนุชา รัตนกุล', 'พิมพ์ชนก ใจดี', 'ภานุวัฒน์ สมบูรณ์', 'ศิริพร นาคสวัสดิ์', 'ธีรเดช อินทร์แก้ว', 'มณีรัตน์ ประเสริฐ',
     'กฤษดา ชัยมงคล', 'จิราพร สุขเจริญ'];
-  const people = ids('people', names.map((n, i) => [n, depts[i % depts.length]]), ['name', 'department_id']);
+  const people = await ids('people', names.map((n, i) => [n, depts[i % depts.length]]), ['name', 'department_id']);
 
   const models = [
     [0, 'โน้ตบุ๊ก Dell Latitude 5440', 'Dell', 'Latitude 5440', 'Core i5-1345U / 16GB / 512GB SSD', 32900, 14],
@@ -89,13 +97,13 @@ tx(() => {
       const warrantyYears = ci === 0 || ci === 1 ? 3 : ci === 4 ? 1 : 2;
       const warranty = new Date(bought); warranty.setFullYear(warranty.getFullYear() + warrantyYears);
       const loc = ci === 4 ? locs[1] : pick([locs[0], locs[0], locs[2], locs[3], locs[4]]);
-      const id = Number(run(`INSERT INTO assets (asset_tag, category_id, name, brand, model, serial_no, specs, location_id, department_id, purchase_date,
+      const id = Number((await run(`INSERT INTO assets (asset_tag, category_id, name, brand, model, serial_no, specs, location_id, department_id, purchase_date,
           purchase_price, po_number, invoice_number, vendor_id, warranty_expiry, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         tag, assetCats[ci], name, brand, model, `${brand.slice(0, 2).toUpperCase()}${Math.floor(rand() * 1e8).toString().padStart(8, '0')}`,
         specs, loc, depts[0], iso(bought), price, `PO-${year}-${String(Math.floor(rand() * 900) + 100)}`, `INV-${Math.floor(rand() * 90000) + 10000}`,
-        pick(vendors), iso(warranty), ts(bought), ts(bought)).lastInsertRowid);
-      atx(id, 'receive', null, 'available', { location_id: loc, cost: price, note: 'รับเข้าคลัง' }, bought);
+        pick(vendors), iso(warranty), ts(bought), ts(bought))).lastInsertRowid);
+      await atx(id, 'receive', null, 'available', { location_id: loc, cost: price, note: 'รับเข้าคลัง' }, bought);
       assetIds.push({ id, ci, bought, loc });
     }
   }
@@ -104,40 +112,40 @@ tx(() => {
   for (const a of assetIds) {
     const roll = rand();
     const someone = pick(people);
-    const dept = get('SELECT department_id FROM people WHERE id = ?', someone).department_id;
+    const dept = (await get('SELECT department_id FROM people WHERE id = ?', someone)).department_id;
     const p = rand() < 0.15 ? null : someone; // some items go to the department as a whole, no named person
     const start = addDays(a.bought, 3);
     const set = (fields) => run(`UPDATE assets SET ${Object.keys(fields).map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`, ...Object.values(fields), ts(new Date()), a.id);
 
     if (a.ci === 4) continue; // network gear stays in server room
     if (roll < 0.42) {
-      set({ status: 'issued', holder_person_id: p, department_id: dept });
-      atx(a.id, 'issue', 'available', 'issued', { person_id: p, department_id: dept, note: 'เบิกใช้งานประจำ' }, start);
+      await set({ status: 'issued', holder_person_id: p, department_id: dept });
+      await atx(a.id, 'issue', 'available', 'issued', { person_id: p, department_id: dept, note: 'เบิกใช้งานประจำ' }, start);
     } else if (roll < 0.62) {
       // borrowed — some overdue
       const when = daysAgo(Math.floor(rand() * 20) + 1);
       const due = addDays(when, Math.floor(rand() * 14) + 2);
-      set({ status: 'borrowed', holder_person_id: someone, department_id: dept, due_date: iso(due) });
-      atx(a.id, 'borrow', 'available', 'borrowed', { person_id: someone, department_id: dept, due_date: iso(due), note: pick(['ใช้นำเสนองานลูกค้า', 'ใช้ระหว่างเครื่องหลักส่งซ่อม', 'อบรมพนักงานใหม่', 'ออกงานนอกสถานที่']) }, when);
+      await set({ status: 'borrowed', holder_person_id: someone, department_id: dept, due_date: iso(due) });
+      await atx(a.id, 'borrow', 'available', 'borrowed', { person_id: someone, department_id: dept, due_date: iso(due), note: pick(['ใช้นำเสนองานลูกค้า', 'ใช้ระหว่างเครื่องหลักส่งซ่อม', 'อบรมพนักงานใหม่', 'ออกงานนอกสถานที่']) }, when);
     } else if (roll < 0.69) {
       const when = daysAgo(Math.floor(rand() * 10) + 1);
-      set({ status: 'repair' });
-      atx(a.id, 'repair_out', 'available', 'repair', { note: pick(['จอแสดงผลเป็นเส้น', 'เปิดไม่ติด', 'แบตเตอรี่เสื่อม', 'กระดาษติดบ่อย']), cost: null }, when);
+      await set({ status: 'repair' });
+      await atx(a.id, 'repair_out', 'available', 'repair', { note: pick(['จอแสดงผลเป็นเส้น', 'เปิดไม่ติด', 'แบตเตอรี่เสื่อม', 'กระดาษติดบ่อย']), cost: null }, when);
     } else if (roll < 0.73) {
       const when = daysAgo(Math.floor(rand() * 10) + 15);
-      set({ status: 'pending_disposal' });
-      atx(a.id, 'repair_out', 'available', 'repair', { note: 'เมนบอร์ดเสีย' }, addDays(when, -20));
-      atx(a.id, 'to_disposal', 'repair', 'pending_disposal', { note: 'ค่าซ่อมสูงกว่ามูลค่าเครื่อง' }, when);
+      await set({ status: 'pending_disposal' });
+      await atx(a.id, 'repair_out', 'available', 'repair', { note: 'เมนบอร์ดเสีย' }, addDays(when, -20));
+      await atx(a.id, 'to_disposal', 'repair', 'pending_disposal', { note: 'ค่าซ่อมสูงกว่ามูลค่าเครื่อง' }, when);
     } else if (roll < 0.76) {
       const when = daysAgo(Math.floor(rand() * 60) + 30);
-      set({ status: 'scrapped' });
-      atx(a.id, 'to_disposal', 'available', 'pending_disposal', { note: 'หมดอายุการใช้งาน' }, addDays(when, -7));
-      atx(a.id, 'scrap', 'pending_disposal', 'scrapped', { note: 'จำหน่ายตามมติคณะกรรมการ ครั้งที่ 3/2026' }, when);
+      await set({ status: 'scrapped' });
+      await atx(a.id, 'to_disposal', 'available', 'pending_disposal', { note: 'หมดอายุการใช้งาน' }, addDays(when, -7));
+      await atx(a.id, 'scrap', 'pending_disposal', 'scrapped', { note: 'จำหน่ายตามมติคณะกรรมการ ครั้งที่ 3/2026' }, when);
     } else if (roll < 0.86) {
       // had a past borrow, returned
       const when = daysAgo(Math.floor(rand() * 60) + 20);
-      atx(a.id, 'borrow', 'available', 'borrowed', { person_id: someone, department_id: dept, due_date: iso(addDays(when, 7)), note: 'ยืมใช้ชั่วคราว' }, when);
-      atx(a.id, 'return', 'borrowed', 'available', { person_id: someone, note: 'คืนสภาพดี' }, addDays(when, 6));
+      await atx(a.id, 'borrow', 'available', 'borrowed', { person_id: someone, department_id: dept, due_date: iso(addDays(when, 7)), note: 'ยืมใช้ชั่วคราว' }, when);
+      await atx(a.id, 'return', 'borrowed', 'available', { person_id: someone, note: 'คืนสภาพดี' }, addDays(when, 6));
     }
   }
 
@@ -154,8 +162,8 @@ tx(() => {
   let barcode = 8850000000010;
   for (const [ci, name, unit, finalQty, reorder, cost] of cons) {
     const sku = String(barcode += 7);
-    const id = Number(run(`INSERT INTO consumables (sku, category_id, name, unit, qty_on_hand, reorder_point, location_id, unit_cost, vendor_id)
-      VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)`, sku, consCats[ci], name, unit, reorder, locs[0], cost, pick(vendors)).lastInsertRowid);
+    const id = Number((await run(`INSERT INTO consumables (sku, category_id, name, unit, qty_on_hand, reorder_point, location_id, unit_cost, vendor_id)
+      VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)`, sku, consCats[ci], name, unit, reorder, locs[0], cost, pick(vendors))).lastInsertRowid);
     // Build history backwards: several receipts and issues over 6 months, ending at finalQty.
     let bal = 0;
     const events = [];
@@ -164,28 +172,29 @@ tx(() => {
     }
     const plannedOut = events.length * 2;
     const firstIn = finalQty + plannedOut + 5;
-    run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, unit_cost, note, performed_by, created_at) VALUES (?, 'in', ?, ?, ?, ?, ?, ?)`,
+    await run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, unit_cost, note, performed_by, created_at) VALUES (?, 'in', ?, ?, ?, ?, ?, ?)`,
       id, firstIn, (bal = firstIn), cost, `รับเข้าตาม PO-2026-${100 + id}`, staffId, ts(daysAgo(178)));
     for (const m of events) {
       if (bal - finalQty <= 0) break;
       const q = Math.min(bal - finalQty, Math.floor(rand() * 3) + 1);
       const p = pick(people);
       bal -= q;
-      const pd = get('SELECT department_id FROM people WHERE id = ?', p).department_id;
-      run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, person_id, department_id, note, performed_by, created_at)
+      const pd = (await get('SELECT department_id FROM people WHERE id = ?', p)).department_id;
+      await run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, person_id, department_id, note, performed_by, created_at)
         VALUES (?, 'out', ?, ?, ?, ?, ?, ?, ?)`,
         id, q, bal, rand() < 0.2 ? null : p, pd, pick(['ของเดิมชำรุด', 'พนักงานใหม่', 'ใช้ห้องประชุม', '']), pick(actors), ts(daysAgo(m)));
     }
     if (bal !== finalQty) {
-      run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, note, performed_by, created_at) VALUES (?, 'adjust', ?, ?, ?, ?, ?)`,
+      await run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, note, performed_by, created_at) VALUES (?, 'adjust', ?, ?, ?, ?, ?)`,
         id, finalQty - bal, finalQty, 'ปรับยอดตามผลตรวจนับ', adminId, ts(daysAgo(1)));
     }
-    run('UPDATE consumables SET qty_on_hand = ? WHERE id = ?', finalQty, id);
+    await run('UPDATE consumables SET qty_on_hand = ? WHERE id = ?', finalQty, id);
   }
 
-  run('UPDATE assets SET received_date = purchase_date');
-  run(`UPDATE stock_movements SET received_date = date(created_at) WHERE type = 'in'`);
+  await run('UPDATE assets SET received_date = purchase_date');
+  await run(`UPDATE stock_movements SET received_date = ${dateOf('created_at')} WHERE type = 'in'`);
 });
+await closeDb();
 
-console.log('Seed complete → data/it_storage.db');
+console.log(`Seed complete → ${mssql ? `SQL Server database ${process.env.MSSQL_DATABASE || 'ITAM'}` : process.env.DB_PATH || 'data/it_storage.db'}`);
 console.log('  admin / Admin@1234   staff / Staff@1234   viewer / Viewer@1234');

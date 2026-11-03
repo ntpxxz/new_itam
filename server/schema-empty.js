@@ -8,10 +8,12 @@ import path from 'node:path';
 
 const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'itam-schema-')), 'empty.db');
 process.env.DB_PATH = tmp;
+process.env.DB_CLIENT = 'sqlite'; // reads sqlite_master; the SQL Server version is docs/create-empty-db.mssql.sql
 
-const { db, ROOT } = await import('./db.js');
+const { ROOT, sqliteHandle } = await import('./db.js');
 const { bootstrap } = await import('./bootstrap.js');
-bootstrap();
+await bootstrap();
+const db = sqliteHandle();
 
 const OUT = path.join(ROOT, 'docs', 'create-empty-db.sql');
 const REF_DATA = ['permissions', 'roles', 'role_permissions', 'settings'];

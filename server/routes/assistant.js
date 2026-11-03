@@ -44,58 +44,58 @@ function wordSearch(ts, cols, run) {
 }
 
 // Names first; category names only when nothing matches by name; finally just the model code ("Mouse M190" → "M190").
-function staged(query, nameCols, catCol, run) {
+async function staged(query, nameCols, catCol, run) {
   const ts = tokens(query);
   if (!ts.length) return [];
-  let rows = wordSearch(ts, nameCols, run);
-  if (!rows.length) rows = wordSearch(ts, [...nameCols, catCol], run);
+  let rows = await wordSearch(ts, nameCols, run);
+  if (!rows.length) rows = await wordSearch(ts, [...nameCols, catCol], run);
   const codes = ts.filter(codeLike);
-  if (!rows.length && codes.length && codes.length < ts.length) rows = wordSearch(codes, nameCols, run);
+  if (!rows.length && codes.length && codes.length < ts.length) rows = await wordSearch(codes, nameCols, run);
   return rows;
 }
 
-function findConsumables(query) {
-  const exact = get('SELECT id, sku, name, unit, qty_on_hand, unit_cost FROM consumables WHERE deleted_at IS NULL AND sku = ? COLLATE NOCASE', query.replace(/"/g, ''));
+async function findConsumables(query) {
+  const exact = await get('SELECT id, sku, name, unit, qty_on_hand, unit_cost FROM consumables WHERE deleted_at IS NULL AND sku = ? COLLATE NOCASE', query.replace(/"/g, ''));
   if (exact) return [exact];
   return staged(query, ['x.sku', 'x.name'], 'c.name', (cond, params) => all(`SELECT x.id, x.sku, x.name, x.unit, x.qty_on_hand, x.unit_cost
     FROM consumables x JOIN categories c ON c.id = x.category_id
-    WHERE x.deleted_at IS NULL AND ${cond} ORDER BY length(x.name), x.name LIMIT 8`, ...params));
+    WHERE x.deleted_at IS NULL AND ${cond} ORDER BY length(x.name), x.name, x.id LIMIT 8`, ...params));
 }
 
-function findAssets(query) {
+async function findAssets(query) {
   const q = query.replace(/"/g, '');
-  const exact = all(`SELECT id, asset_tag, name, status FROM assets WHERE deleted_at IS NULL AND (asset_tag = ? COLLATE NOCASE OR serial_no = ? COLLATE NOCASE)`, q, q);
+  const exact = await all(`SELECT id, asset_tag, name, status FROM assets WHERE deleted_at IS NULL AND (asset_tag = ? COLLATE NOCASE OR serial_no = ? COLLATE NOCASE)`, q, q);
   if (exact.length) return { exact: true, rows: exact };
   if (/^".+"$/.test(query.trim())) {
-    return { exact: false, rows: all(`SELECT id, asset_tag, name, status FROM assets WHERE deleted_at IS NULL AND status <> 'scrapped' AND name = ? COLLATE NOCASE
-      ORDER BY status = 'available' DESC, asset_tag LIMIT 50`, q) };
+    return { exact: false, rows: await all(`SELECT id, asset_tag, name, status FROM assets WHERE deleted_at IS NULL AND status <> 'scrapped' AND name = ? COLLATE NOCASE
+      ORDER BY CASE WHEN status = 'available' THEN 0 ELSE 1 END, asset_tag LIMIT 50`, q) };
   }
-  return { exact: false, rows: staged(query, ['a.name', 'a.brand', 'a.model'], 'c.name', (cond, params) => all(`SELECT a.id, a.asset_tag, a.name, a.status
+  return { exact: false, rows: await staged(query, ['a.name', 'a.brand', 'a.model'], 'c.name', (cond, params) => all(`SELECT a.id, a.asset_tag, a.name, a.status
     FROM assets a JOIN categories c ON c.id = a.category_id
-    WHERE a.deleted_at IS NULL AND a.status <> 'scrapped' AND ${cond} ORDER BY a.status = 'available' DESC, a.asset_tag LIMIT 50`, ...params)) };
+    WHERE a.deleted_at IS NULL AND a.status <> 'scrapped' AND ${cond} ORDER BY CASE WHEN a.status = 'available' THEN 0 ELSE 1 END, a.asset_tag LIMIT 50`, ...params)) };
 }
 
 const DEPT_WORD = /^(แผนก|ฝ่าย(?=\S)|dept\.?|department)\s*/i;
 
-function findDepartment(text) {
+async function findDepartment(text) {
   const t = text.trim();
   const bare = t.replace(/^(แผนก|dept\.?|department)\s*/i, '').replace(/\s+(dept\.?|department)$/i, '').trim();
   for (const n of [t, bare]) {
-    const d = get('SELECT name FROM departments WHERE deleted_at IS NULL AND name = ? COLLATE NOCASE', n);
+    const d = await get('SELECT name FROM departments WHERE deleted_at IS NULL AND name = ? COLLATE NOCASE', n);
     if (d) return { name: d.name, known: true };
   }
-  const like = all(`SELECT name FROM departments WHERE deleted_at IS NULL AND name LIKE ? ESCAPE '\\' LIMIT 2`, likeTerm(bare));
+  const like = await all(`SELECT name FROM departments WHERE deleted_at IS NULL AND name LIKE ? ESCAPE '\\' ORDER BY name LIMIT 2`, likeTerm(bare));
   if (like.length === 1) return { name: like[0].name, known: true };
   return { name: bare, known: false };
 }
 
 // "สมชาย แผนกบัญชี" → name + department; "แผนกบัญชี" / "IT dept" / a known department → department only.
-function splitRecipient(text) {
+async function splitRecipient(text) {
   const t = text.trim();
   const m = t.match(/^(.*?)\s*((?:แผนก|dept\.?\s|department\s)\s*.+)$/i) || t.match(/^(.*?)\s+(\S+\s+(?:dept\.?|department))$/i);
-  if (m) return { person_name: m[1].trim() || null, dept: findDepartment(m[2]) };
-  if (DEPT_WORD.test(t) || /\s(dept\.?|department)$/i.test(t)) return { person_name: null, dept: findDepartment(t) };
-  const asDept = get('SELECT name FROM departments WHERE deleted_at IS NULL AND name = ? COLLATE NOCASE', t);
+  if (m) return { person_name: m[1].trim() || null, dept: await findDepartment(m[2]) };
+  if (DEPT_WORD.test(t) || /\s(dept\.?|department)$/i.test(t)) return { person_name: null, dept: await findDepartment(t) };
+  const asDept = await get('SELECT name FROM departments WHERE deleted_at IS NULL AND name = ? COLLATE NOCASE', t);
   if (asDept) return { person_name: null, dept: { name: asDept.name, known: true } };
   return { person_name: t, dept: null };
 }
@@ -103,7 +103,7 @@ function splitRecipient(text) {
 /* ---------- build the draft ---------- */
 const STATUS_TH = { available: 'พร้อมใช้', borrowed: 'ถูกยืม', issued: 'เบิกถาวร', repair: 'กำลังซ่อม', pending_disposal: 'รอจำหน่าย' };
 
-function buildDraft(user, text) {
+async function buildDraft(user, text) {
   const p = parseMessage(text, today());
   if (!p.intent) return { reply: `ไม่เข้าใจคำสั่ง\n${HELP}` };
   const { intent } = p;
@@ -122,7 +122,7 @@ function buildDraft(user, text) {
     draft.mode = intent === 'borrow' ? 'borrow' : 'issue';
     if (!p.recipient) problems.push(`ระบุผู้รับด้วย “ให้ <ชื่อ>” หรือ “ให้แผนก<ชื่อแผนก>”`);
     else {
-      const rc = splitRecipient(p.recipient);
+      const rc = await splitRecipient(p.recipient);
       draft.person_name = rc.person_name;
       draft.department_name = rc.dept?.name || null;
       if (rc.dept && !rc.dept.known) newDept = rc.dept.name;
@@ -136,36 +136,36 @@ function buildDraft(user, text) {
 
   const choices = [];
   const usedAssets = new Set();
-  p.segments.forEach((s, i) => {
+  for (const [i, s] of p.segments.entries()) {
     const label = p.segments.length > 1 ? `รายการที่ ${i + 1} (“${s.query}”)` : `“${s.query}”`;
     const qty = s.qty ?? 1;
-    if (!(qty > 0) || qty > MAX_UNITS) { problems.push(`${label}: จำนวนต้องอยู่ระหว่าง 1–${MAX_UNITS}`); return; }
+    if (!(qty > 0) || qty > MAX_UNITS) { problems.push(`${label}: จำนวนต้องอยู่ระหว่าง 1–${MAX_UNITS}`); continue; }
 
-    const cons = intent === 'borrow' ? [] : findConsumables(s.query);
-    const assets = intent === 'receive' ? { rows: [] } : findAssets(s.query);
+    const cons = intent === 'borrow' ? [] : await findConsumables(s.query);
+    const assets = intent === 'receive' ? { rows: [] } : await findAssets(s.query);
     const avail = assets.rows.filter((a) => a.status === 'available' && !usedAssets.has(a.id));
     const assetNames = [...new Set(avail.map((a) => a.name))];
 
     if (cons.length === 1 && !assets.exact) {
       const x = cons[0];
-      if (intent === 'issue' && qty > x.qty_on_hand) { problems.push(`${label}: ${x.name} คงเหลือ ${x.qty_on_hand} ${x.unit} ไม่พอเบิก ${qty}`); return; }
+      if (intent === 'issue' && qty > x.qty_on_hand) { problems.push(`${label}: ${x.name} คงเหลือ ${x.qty_on_hand} ${x.unit} ไม่พอเบิก ${qty}`); continue; }
       draft.lines.push({ kind: 'consumable', consumable_id: x.id, code: x.sku, name: x.name, unit: x.unit, qty_on_hand: x.qty_on_hand, qty,
         ...(intent === 'receive' && { unit_cost: s.price ?? x.unit_cost ?? null }) });
-      return;
+      continue;
     }
     if (intent !== 'receive' && (assets.exact || (!cons.length && assetNames.length === 1))) {
       if (assets.exact && assets.rows.length === 1 && assets.rows[0].status !== 'available') {
         const a = assets.rows[0];
-        problems.push(`${label}: ${a.asset_tag} สถานะ “${STATUS_TH[a.status] || a.status}” — เบิก/ยืมได้เฉพาะชิ้นที่พร้อมใช้`); return;
+        problems.push(`${label}: ${a.asset_tag} สถานะ “${STATUS_TH[a.status] || a.status}” — เบิก/ยืมได้เฉพาะชิ้นที่พร้อมใช้`); continue;
       }
-      if (avail.length < qty) { problems.push(`${label}: ${assetNames[0] || s.query} พร้อมใช้ ${avail.length} ชิ้น ไม่พอ${INTENT_WORD[intent]} ${qty}`); return; }
+      if (avail.length < qty) { problems.push(`${label}: ${assetNames[0] || s.query} พร้อมใช้ ${avail.length} ชิ้น ไม่พอ${INTENT_WORD[intent]} ${qty}`); continue; }
       avail.slice(0, qty).forEach((a) => {
         usedAssets.add(a.id);
         draft.lines.push({ kind: 'asset', asset_id: a.id, code: a.asset_tag, name: a.name, qty: 1 });
       });
-      return;
+      continue;
     }
-    if (intent === 'borrow' && !assets.rows.length && findConsumables(s.query).length) { problems.push(`${label}: เป็นของสิ้นเปลือง ยืมไม่ได้ — ใช้ “เบิก” แทน`); return; }
+    if (intent === 'borrow' && !assets.rows.length && (await findConsumables(s.query)).length) { problems.push(`${label}: เป็นของสิ้นเปลือง ยืมไม่ได้ — ใช้ “เบิก” แทน`); continue; }
 
     const options = [
       ...cons.map((x) => ({ label: `${x.name} · ${x.sku} · คงเหลือ ${x.qty_on_hand} ${x.unit}`, code: x.sku })),
@@ -176,14 +176,14 @@ function buildDraft(user, text) {
       if (!choices.length) {
         options.forEach((o) => choices.push({ label: o.label, command: rebuild(p, i, o.code) }));
       }
-    } else if (intent === 'receive' && findAssets(s.query).rows.length) {
+    } else if (intent === 'receive' && (await findAssets(s.query)).rows.length) {
       problems.push(`${label}: เป็นอุปกรณ์รายชิ้น — รับเข้าชิ้นใหม่ที่หน้า “รับเข้า” เพื่อกรอกหมวดหมู่ ราคา และ Serial`);
     } else if (assets.rows.length) {
       problems.push(`${label}: ไม่มีชิ้นที่พร้อมใช้ (${assets.rows.slice(0, 3).map((a) => `${a.asset_tag} ${STATUS_TH[a.status] || a.status}`).join(', ')})`);
     } else {
       problems.push(`${label}: ไม่พบในระบบ — ตรวจสอบชื่อ/รหัส หรือสร้างรายการใหม่ที่หน้า “อุปกรณ์ → เพิ่ม”`);
     }
-  });
+  }
 
   if (problems.length) return { reply: problems.join('\n'), choices };
   const n = draft.lines.length;
@@ -204,11 +204,11 @@ function rebuild(p, index, code) {
 }
 
 /* ---------- route ---------- */
-r.post('/chat', requirePerm('asset.create', 'consumable.move', 'asset.transact'), (req, res) => {
+r.post('/chat', requirePerm('asset.create', 'consumable.move', 'asset.transact'), async (req, res) => {
   const text = String(req.body?.message || '').trim().slice(0, 1000);
   if (!text) throw bad('กรุณาพิมพ์ข้อความ');
   if (/^(help|ช่วย|ช่วยเหลือ|วิธีใช้|\?)$/i.test(text)) return res.json({ reply: HELP });
-  res.json(buildDraft(req.user, text));
+  res.json(await buildDraft(req.user, text));
 });
 
 export default r;

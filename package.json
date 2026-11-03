@@ -13,7 +13,8 @@
     "start": "node --no-warnings=ExperimentalWarning server/index.js --prod",
     "seed": "node --no-warnings=ExperimentalWarning server/seed.js",
     "import-stock": "node --no-warnings=ExperimentalWarning server/import-stock.js",
-    "schema:empty": "node --no-warnings=ExperimentalWarning server/schema-empty.js"
+    "schema:empty": "node --no-warnings=ExperimentalWarning server/schema-empty.js",
+    "migrate:mssql": "node --no-warnings=ExperimentalWarning server/migrate-sqlite-to-mssql.js"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
@@ -23,6 +24,7 @@
     "express": "^4.22.3",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.59.0",
+    "mssql": "^12.7.13",
     "multer": "^2.4.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",

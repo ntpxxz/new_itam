@@ -20,18 +20,20 @@ npm start        # production: Express serves dist/ on :3093
 npm run seed     # wipe + re-seed demo data (data/it_storage.db)
 npm run import-stock -- a.csv b.csv   # load opening consumable stock from inventory CSV exports (skips existing SKUs)
 npm run schema:empty   # regenerate docs/create-empty-db.sql (schema + permissions/roles/settings, no users)
+npm run migrate:mssql -- data/it_storage.db [--replace] [--dry-run]   # copy a SQLite DB into the SQL Server DB from .env, keeping ids
 ```
 
 - Port is **3093** (override with `PORT`). Listens on `0.0.0.0` so phones on the LAN can open QR links.
 - Default login after seed: `admin / Admin@1234` (Admin), `staff / Staff@1234` (IT Staff), `viewer / Viewer@1234` (Viewer)
 - Requires Node ≥ 22.13 (uses built-in `node:sqlite`, no native modules).
+- Database is chosen in `.env`: `DB_CLIENT=sqlite` (default) or `DB_CLIENT=mssql` + `MSSQL_SERVER/PORT/DATABASE/USER/PASSWORD` (SQL login; create it with `docs/create-app-login.mssql.sql`). On SQL Server, tables are created on start from `server/schema.mssql.sql`; `npm run seed` drops and recreates every table.
 
 ## Stack
 
 | Layer | Choice | Why |
 |---|---|---|
 | Server | Node + Express 4 (ESM) | simple, one process |
-| DB | SQLite via `node:sqlite` (`data/it_storage.db`) | zero-install, file-based, WAL |
+| DB | SQLite via `node:sqlite` (`data/it_storage.db`) **or** SQL Server via `mssql` (`DB_CLIENT` in `.env`) | zero-install default; SQL Server for central hosting |
 | Auth | server-side sessions table + httpOnly cookie, `bcryptjs` | idle timeout & revoke are easy |
 | Client | React 18 + Vite + react-router | SPA, served by Express |
 | Icons | `lucide-react` | |
@@ -45,8 +47,10 @@ npm run schema:empty   # regenerate docs/create-empty-db.sql (schema + permissio
 ```
 server/
   index.js            app bootstrap, security headers, vite middleware (dev) / static (prod)
-  db.js               open DB, run schema.sql, helpers (tx, now)
-  schema.sql          all tables, indexes, immutable-log triggers
+  db.js               driver (sqlite | mssql), async all/get/run/tx, SQLite→T-SQL rewrite, ym()/localDate()/dateOf()
+  schema.sql          all tables, indexes, immutable-log triggers (SQLite)
+  schema.mssql.sql    same schema for SQL Server (idempotent, run on start)
+  async-routes.js     forwards rejected async handlers to the Express error middleware
   seed.js             demo data
   auth.js             sessions, login lockout, password policy, requirePerm()
   audit.js            audit(req, entity, id, action, before, after)
@@ -154,7 +158,9 @@ available ──transfer──▶ available (location/department move)
 
 ## Conventions
 - API: JSON under `/api/*`; errors `{ error: "ข้อความภาษาไทย" }` with proper status codes. List endpoints return `{ rows, total, page, pageSize }`.
-- SQL: always parameterized (`?`). Wrap multi-statement writes in `tx()`.
+- SQL: always parameterized (`?`). Wrap multi-statement writes in `await tx(async () => …)`. `all/get/run` are async — always `await` them, and never run queries in parallel inside `tx()`.
+- SQL must run on both SQLite and SQL Server: write SQLite syntax with `?`; `db.js` rewrites `?`, `LIMIT/OFFSET` (needs ORDER BY), `COLLATE NOCASE`, `length()`. Do date math in JS (`today()`, `addDays()`, `monthStart()`, `minutesAgo()`) and pass it as a parameter; use `ym()` / `localDate()` / `dateOf()` for the rest. No `ON CONFLICT`, `INSERT OR`, `IS NOT ?`, `||`, boolean expressions in SELECT (use CASE), `rowid`; alias derived tables; quote the `key` column as `"key"`.
+- Schema changes: update `schema.sql` (+ `addColumn()`) **and** `schema.mssql.sql`.
 - Keep comments sparse; name things clearly instead.
 
 ---

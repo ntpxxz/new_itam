@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { all, get, run, now, setting } from './db.js';
+import { all, get, run, now, setting, minutesAgo } from './db.js';
 import { accessLog, clientIp } from './audit.js';
 
 const COOKIE = 'af_sid';
@@ -27,40 +27,38 @@ function setCookie(res, value, maxAgeSec) {
   res.setHeader('Set-Cookie', `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSec}${secure}`);
 }
 
-export function permsForRole(roleId) {
-  return all('SELECT perm_key FROM role_permissions WHERE role_id = ?', roleId).map((r) => r.perm_key);
+export async function permsForRole(roleId) {
+  return (await all('SELECT perm_key FROM role_permissions WHERE role_id = ?', roleId)).map((r) => r.perm_key);
 }
 
-function loadUser(userId) {
-  const u = get(
-    `SELECT u.id, u.username, u.full_name, u.role_id, r.name AS role_name, r.key AS role_key
+async function loadUser(userId) {
+  const u = await get(
+    `SELECT u.id, u.username, u.full_name, u.role_id, r.name AS role_name, r."key" AS role_key
      FROM users u JOIN roles r ON r.id = u.role_id
      WHERE u.id = ? AND u.is_active = 1 AND u.deleted_at IS NULL`, userId);
   if (!u) return null;
-  u.permissions = permsForRole(u.role_id);
+  u.permissions = await permsForRole(u.role_id);
   return u;
 }
 
-const idleMinutes = () => Number(setting('session_idle_minutes', '30'));
+const idleMinutes = async () => Number(await setting('session_idle_minutes', '30'));
 
 // Attaches req.user when the session is valid; slides the idle timeout.
-export function sessionMiddleware(req, res, next) {
+export async function sessionMiddleware(req, res, next) {
   const sid = parseCookies(req.headers.cookie)[COOKIE];
   if (sid) {
-    const s = get(
-      `SELECT * FROM sessions WHERE id = ? AND last_seen > datetime('now', ?)`,
-      sid, `-${idleMinutes()} minutes`,
-    );
+    const idle = await idleMinutes();
+    const s = await get('SELECT * FROM sessions WHERE id = ? AND last_seen > ?', sid, minutesAgo(idle));
     if (s) {
-      const user = loadUser(s.user_id);
+      const user = await loadUser(s.user_id);
       if (user) {
         req.user = user;
         req.sessionId = sid;
-        run('UPDATE sessions SET last_seen = ? WHERE id = ?', now(), sid);
-        setCookie(res, sid, idleMinutes() * 60);
+        await run('UPDATE sessions SET last_seen = ? WHERE id = ?', now(), sid);
+        setCookie(res, sid, idle * 60);
       }
     } else {
-      run('DELETE FROM sessions WHERE id = ?', sid);
+      await run('DELETE FROM sessions WHERE id = ?', sid);
     }
   }
   next();
@@ -83,58 +81,59 @@ export function requirePerm(...perms) {
   };
 }
 
-export function login(req, res) {
+export async function login(req, res) {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' });
 
-  const u = get('SELECT * FROM users WHERE username = ? AND deleted_at IS NULL', String(username).trim());
+  const u = await get('SELECT * FROM users WHERE username = ? AND deleted_at IS NULL', String(username).trim());
   const generic = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
 
   if (!u) {
-    accessLog(req, null, username, 'login_failed');
+    await accessLog(req, null, username, 'login_failed');
     return res.status(401).json({ error: generic });
   }
   if (!u.is_active) {
-    accessLog(req, u.id, u.username, 'login_failed');
+    await accessLog(req, u.id, u.username, 'login_failed');
     return res.status(403).json({ error: 'บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ' });
   }
   if (u.locked_until && u.locked_until > now()) {
-    accessLog(req, u.id, u.username, 'login_blocked');
+    await accessLog(req, u.id, u.username, 'login_blocked');
     const mins = Math.ceil((new Date(u.locked_until.replace(' ', 'T') + 'Z') - Date.now()) / 60000);
     return res.status(423).json({ error: `บัญชีถูกล็อกชั่วคราวเนื่องจากใส่รหัสผิดหลายครั้ง ลองใหม่ใน ${mins} นาที` });
   }
 
   if (!bcrypt.compareSync(password, u.password_hash)) {
-    const max = Number(setting('max_failed_logins', '5'));
+    const max = Number(await setting('max_failed_logins', '5'));
+    const lockMinutes = await setting('lockout_minutes', '15');
     const attempts = u.failed_attempts + 1;
     if (attempts >= max) {
-      const until = new Date(Date.now() + Number(setting('lockout_minutes', '15')) * 60000).toISOString().replace('T', ' ').slice(0, 19);
-      run('UPDATE users SET failed_attempts = 0, locked_until = ? WHERE id = ?', until, u.id);
-      accessLog(req, u.id, u.username, 'locked');
-      return res.status(423).json({ error: `ใส่รหัสผิด ${max} ครั้ง บัญชีถูกล็อก ${setting('lockout_minutes', '15')} นาที` });
+      const until = new Date(Date.now() + Number(lockMinutes) * 60000).toISOString().replace('T', ' ').slice(0, 19);
+      await run('UPDATE users SET failed_attempts = 0, locked_until = ? WHERE id = ?', until, u.id);
+      await accessLog(req, u.id, u.username, 'locked');
+      return res.status(423).json({ error: `ใส่รหัสผิด ${max} ครั้ง บัญชีถูกล็อก ${lockMinutes} นาที` });
     }
-    run('UPDATE users SET failed_attempts = ? WHERE id = ?', attempts, u.id);
-    accessLog(req, u.id, u.username, 'login_failed');
+    await run('UPDATE users SET failed_attempts = ? WHERE id = ?', attempts, u.id);
+    await accessLog(req, u.id, u.username, 'login_failed');
     return res.status(401).json({ error: `${generic} (เหลืออีก ${max - attempts} ครั้งก่อนบัญชีถูกล็อก)` });
   }
 
-  run('UPDATE users SET failed_attempts = 0, locked_until = NULL, last_login_at = ? WHERE id = ?', now(), u.id);
+  await run('UPDATE users SET failed_attempts = 0, locked_until = NULL, last_login_at = ? WHERE id = ?', now(), u.id);
   const sid = crypto.randomBytes(32).toString('hex');
-  run('INSERT INTO sessions (id, user_id, ip, user_agent) VALUES (?, ?, ?, ?)', sid, u.id, clientIp(req), (req.headers['user-agent'] || '').slice(0, 300));
-  setCookie(res, sid, idleMinutes() * 60);
-  accessLog(req, u.id, u.username, 'login');
-  res.json({ user: loadUser(u.id) });
+  await run('INSERT INTO sessions (id, user_id, ip, user_agent) VALUES (?, ?, ?, ?)', sid, u.id, clientIp(req), (req.headers['user-agent'] || '').slice(0, 300));
+  setCookie(res, sid, (await idleMinutes()) * 60);
+  await accessLog(req, u.id, u.username, 'login');
+  res.json({ user: await loadUser(u.id) });
 }
 
-export function logout(req, res) {
+export async function logout(req, res) {
   if (req.sessionId) {
-    run('DELETE FROM sessions WHERE id = ?', req.sessionId);
-    accessLog(req, req.user.id, req.user.username, 'logout');
+    await run('DELETE FROM sessions WHERE id = ?', req.sessionId);
+    await accessLog(req, req.user.id, req.user.username, 'logout');
   }
   setCookie(res, '', 0);
   res.json({ ok: true });
 }
 
-export function purgeExpiredSessions() {
-  run(`DELETE FROM sessions WHERE last_seen < datetime('now', ?)`, `-${idleMinutes()} minutes`);
+export async function purgeExpiredSessions() {
+  await run('DELETE FROM sessions WHERE last_seen < ?', minutesAgo(await idleMinutes()));
 }

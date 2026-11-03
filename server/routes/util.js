@@ -15,9 +15,22 @@ export function paging(req, defaultSize = 20) {
   return { page, pageSize, offset: (page - 1) * pageSize };
 }
 
-export const likeTerm = (q) => `%${String(q).trim().replace(/[%_]/g, (m) => '\\' + m)}%`;
+// Escapes LIKE wildcards; [ too, because SQL Server treats [..] as a character class.
+export const likeTerm = (q) => `%${String(q).trim().replace(/[%_[\\]/g, (m) => '\\' + m)}%`;
 
 export const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+// 'YYYY-MM-DD' + n days (n may be negative)
+export const addDays = (date, n) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + Number(n));
+  return d.toISOString().slice(0, 10);
+};
+// First day of the month, `back` months before the month of `date`
+export const monthStart = (date, back = 0) => {
+  const d = new Date(`${date.slice(0, 7)}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() - back);
+  return d.toISOString().slice(0, 10);
+};
 export const isDate =(s) => !s || /^\d{4}-\d{2}-\d{2}$/.test(s);
 export const toNum = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
 export const toInt = (v) => (v === '' || v === null || v === undefined ? null : parseInt(v, 10));

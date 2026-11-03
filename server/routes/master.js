@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { all, get, run, now, tx } from '../db.js';
 import { requirePerm, requireAuth } from '../auth.js';
 import { audit } from '../audit.js';
-import { bad, notFound, likeTerm } from './util.js';
+import { bad, notFound, likeTerm, toInt } from './util.js';
 
 // Generic soft-delete CRUD for small lookup tables.
 const TABLES = {
@@ -23,17 +23,17 @@ const LIST_SQL = {
 
 // before = current row when editing. Names must be unique (case-insensitive) because recipients
 // and imports link to master rows by typed name; only checked when the name actually changes.
-function validate(table, body, before = null) {
+async function validate(table, body, before = null) {
   const def = TABLES[table];
   for (const f of def.required) if (!String(body[f] ?? '').trim()) throw bad(`กรุณากรอก ${f === 'name' ? 'ชื่อ' : f}`);
   body.name = String(body.name).trim().replace(/\s+/g, ' ');
   if (!before || body.name.toLowerCase() !== String(before.name).toLowerCase()) {
-    const dup = get(`SELECT id FROM ${table} WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL AND id IS NOT ?`, body.name, before?.id ?? null);
+    const dup = await get(`SELECT id FROM ${table} WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL AND id <> ?`, body.name, before?.id ?? 0);
     if (dup) throw bad(`มี${def.label}ชื่อ "${body.name}" อยู่แล้ว — ใช้ชื่ออื่น หรือแก้ไขรายการเดิม`);
   }
   if (table === 'people') {
     const dept = body.department_id === '' || body.department_id == null ? null : Number(body.department_id);
-    if (dept !== null && !get('SELECT id FROM departments WHERE id = ? AND deleted_at IS NULL', dept)) {
+    if (dept !== null && !(await get('SELECT id FROM departments WHERE id = ? AND deleted_at IS NULL', dept))) {
       throw bad('ไม่พบแผนกที่เลือก (อาจถูกลบไปแล้ว) — เลือกแผนกใหม่');
     }
     body.department_id = dept;
@@ -52,7 +52,7 @@ function validate(table, body, before = null) {
 
 const r = Router();
 
-r.get('/:table', requireAuth, (req, res) => {
+r.get('/:table', requireAuth, async (req, res) => {
   const { table } = req.params;
   if (!TABLES[table]) throw notFound('ตาราง');
   let sql = LIST_SQL[table] || `SELECT * FROM ${table} WHERE deleted_at IS NULL`;
@@ -64,62 +64,63 @@ r.get('/:table', requireAuth, (req, res) => {
     params.push(likeTerm(req.query.q));
   }
   sql += ' ORDER BY name COLLATE NOCASE';
-  res.json({ rows: all(sql, ...params) });
+  res.json({ rows: await all(sql, ...params) });
 });
 
-r.post('/:table', requirePerm('master.manage'), (req, res) => {
+r.post('/:table', requirePerm('master.manage'), async (req, res) => {
   const { table } = req.params;
   const def = TABLES[table];
   if (!def) throw notFound('ตาราง');
-  const values = validate(table, req.body || {});
-  const id = tx(() => {
-    const info = run(`INSERT INTO ${table} (${def.fields.join(',')}) VALUES (${def.fields.map(() => '?').join(',')})`, ...values);
-    const row = get(`SELECT * FROM ${table} WHERE id = ?`, info.lastInsertRowid);
-    audit(req, table, row.id, 'create', null, row);
+  const values = await validate(table, req.body || {});
+  const id = await tx(async () => {
+    const info = await run(`INSERT INTO ${table} (${def.fields.join(',')}) VALUES (${def.fields.map(() => '?').join(',')})`, ...values);
+    const row = await get(`SELECT * FROM ${table} WHERE id = ?`, info.lastInsertRowid);
+    await audit(req, table, row.id, 'create', null, row);
     return row.id;
   });
-  res.status(201).json(get(`SELECT * FROM ${table} WHERE id = ?`, id));
+  res.status(201).json(await get(`SELECT * FROM ${table} WHERE id = ?`, id));
 });
 
-r.put('/:table/:id', requirePerm('master.manage'), (req, res) => {
-  const { table, id } = req.params;
+r.put('/:table/:id', requirePerm('master.manage'), async (req, res) => {
+  const { table } = req.params;
+  const id = toInt(req.params.id);
   const def = TABLES[table];
   if (!def) throw notFound('ตาราง');
-  const before = get(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`, id);
+  const before = await get(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`, id);
   if (!before) throw notFound(def.label);
-  const values = validate(table, { ...before, ...req.body }, before);
+  const values = await validate(table, { ...before, ...req.body }, before);
   if (table === 'categories' && req.body.kind && req.body.kind !== before.kind) {
-    const used = get(LIST_SQL.categories + ' AND c.id = ?', id).usage;
+    const used = (await get(LIST_SQL.categories + ' AND c.id = ?', id)).usage;
     if (used) throw bad(`เปลี่ยนวิธีติดตามไม่ได้ เพราะมี ${used} รายการในหมวดนี้ — สร้างหมวดใหม่แทน`);
   }
-  tx(() => {
-    run(`UPDATE ${table} SET ${def.fields.map((f) => `${f} = ?`).join(', ')} WHERE id = ?`, ...values, id);
-    audit(req, table, Number(id), 'update', before, get(`SELECT * FROM ${table} WHERE id = ?`, id));
+  await tx(async () => {
+    await run(`UPDATE ${table} SET ${def.fields.map((f) => `${f} = ?`).join(', ')} WHERE id = ?`, ...values, id);
+    await audit(req, table, id, 'update', before, await get(`SELECT * FROM ${table} WHERE id = ?`, id));
   });
-  res.json(get(`SELECT * FROM ${table} WHERE id = ?`, id));
+  res.json(await get(`SELECT * FROM ${table} WHERE id = ?`, id));
 });
 
-function softDelete(req, table, before) {
+async function softDelete(req, table, before) {
   const { id } = before;
   if (table === 'categories') {
-    const used = get(LIST_SQL.categories + ' AND c.id = ?', id).usage;
+    const used = (await get(LIST_SQL.categories + ' AND c.id = ?', id)).usage;
     if (used) throw bad(`ลบ "${before.name}" ไม่ได้ เพราะยังมีรายการ ${used} รายการในหมวดนี้ — ย้ายรายการไปหมวดอื่นก่อน`);
   }
   if (table === 'people') {
-    const held = get(`SELECT COUNT(*) n FROM assets WHERE holder_person_id = ? AND status IN ('borrowed','issued') AND deleted_at IS NULL`, id).n;
+    const held = (await get(`SELECT COUNT(*) n FROM assets WHERE holder_person_id = ? AND status IN ('borrowed','issued') AND deleted_at IS NULL`, id)).n;
     if (held) throw bad(`ลบไม่ได้ เพราะ ${before.name} ยังถือครองอุปกรณ์ ${held} รายการ — รับคืนหรือโอนย้ายก่อน`);
   }
-  run(`UPDATE ${table} SET deleted_at = ? WHERE id = ?`, now(), id);
-  audit(req, table, id, 'delete', before, null);
+  await run(`UPDATE ${table} SET deleted_at = ? WHERE id = ?`, now(), id);
+  await audit(req, table, id, 'delete', before, null);
 }
 
-r.delete('/:table/:id', requirePerm('master.manage'), (req, res) => {
-  const { table, id } = req.params;
+r.delete('/:table/:id', requirePerm('master.manage'), async (req, res) => {
+  const { table } = req.params;
   const def = TABLES[table];
   if (!def) throw notFound('ตาราง');
-  const before = get(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`, id);
+  const before = await get(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`, toInt(req.params.id));
   if (!before) throw notFound(def.label);
-  tx(() => softDelete(req, table, before));
+  await tx(() => softDelete(req, table, before));
   res.json({ ok: true });
 });
 
@@ -127,7 +128,7 @@ r.delete('/:table/:id', requirePerm('master.manage'), (req, res) => {
 // Only non-unique fields can be bulk-set (e.g. a person's department).
 const BULK_SET = { people: ['department_id'], locations: ['branch'] };
 
-r.post('/:table/bulk', requirePerm('master.manage'), (req, res) => {
+r.post('/:table/bulk', requirePerm('master.manage'), async (req, res) => {
   const { table } = req.params;
   const def = TABLES[table];
   if (!def) throw notFound('ตาราง');
@@ -138,14 +139,14 @@ r.post('/:table/bulk', requirePerm('master.manage'), (req, res) => {
   if (action === 'set' && !BULK_SET[table]?.includes(field)) throw bad('แก้ไขพร้อมกันได้เฉพาะบางช่องเท่านั้น');
   if (!['delete', 'set'].includes(action)) throw bad('คำสั่งไม่ถูกต้อง');
 
-  tx(() => {
+  await tx(async () => {
     for (const id of ids) {
-      const before = get(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`, id);
+      const before = await get(`SELECT * FROM ${table} WHERE id = ? AND deleted_at IS NULL`, id);
       if (!before) throw bad(`ไม่พบ${def.label}บางรายการ (อาจถูกลบไปแล้ว) — โหลดหน้าใหม่แล้วลองอีกครั้ง`);
-      if (action === 'delete') { softDelete(req, table, before); continue; }
-      const values = validate(table, { ...before, [field]: value }, before);
-      run(`UPDATE ${table} SET ${def.fields.map((f) => `${f} = ?`).join(', ')} WHERE id = ?`, ...values, id);
-      audit(req, table, id, 'update', before, get(`SELECT * FROM ${table} WHERE id = ?`, id));
+      if (action === 'delete') { await softDelete(req, table, before); continue; }
+      const values = await validate(table, { ...before, [field]: value }, before);
+      await run(`UPDATE ${table} SET ${def.fields.map((f) => `${f} = ?`).join(', ')} WHERE id = ?`, ...values, id);
+      await audit(req, table, id, 'update', before, await get(`SELECT * FROM ${table} WHERE id = ?`, id));
     }
   });
   res.json({ ok: true, count: ids.length });

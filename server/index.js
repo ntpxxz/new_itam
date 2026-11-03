@@ -1,9 +1,10 @@
 import './env.js';
 import express from 'express';
+import './async-routes.js';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
-import { ROOT, UPLOAD_DIR } from './db.js';
+import { ROOT, UPLOAD_DIR, CLIENT } from './db.js';
 import { bootstrap, purgeOldLogs } from './bootstrap.js';
 import { sessionMiddleware, requireAuth, purgeExpiredSessions } from './auth.js';
 import authRoutes from './routes/auth.js';
@@ -22,9 +23,11 @@ import assistantRoutes from './routes/assistant.js';
 const PORT = Number(process.env.PORT || 3093);
 const PROD = process.argv.includes('--prod') || process.env.NODE_ENV === 'production';
 
-bootstrap();
-purgeOldLogs();
-setInterval(() => { purgeOldLogs(); purgeExpiredSessions(); }, 6 * 60 * 60 * 1000).unref();
+await bootstrap();
+await purgeOldLogs();
+setInterval(() => {
+  purgeOldLogs().then(purgeExpiredSessions).catch((e) => console.error('  maintenance failed:', e.message));
+}, 6 * 60 * 60 * 1000).unref();
 
 const app = express();
 const server = http.createServer(app);
@@ -95,5 +98,5 @@ app.use((err, req, res, next) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  IT Store  ${PROD ? '(production)' : '(dev)'}  →  http://localhost:${PORT}\n`);
+  console.log(`\n  IT Store  ${PROD ? '(production)' : '(dev)'}  →  http://localhost:${PORT}   db: ${CLIENT}\n`);
 });

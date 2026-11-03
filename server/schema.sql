@@ -173,6 +173,7 @@ CREATE TABLE IF NOT EXISTS consumables (
   unit_cost     REAL,
   vendor_id     INTEGER REFERENCES vendors(id),
   notes         TEXT,
+  image_path    TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at    TEXT
