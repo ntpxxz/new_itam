@@ -23,6 +23,7 @@ npm run schema:empty   # regenerate docs/create-empty-db.sql (schema + permissio
 npm run migrate:mssql -- data/it_storage.db [--replace] [--dry-run]   # copy a SQLite DB into the SQL Server DB from .env, keeping ids
 ```
 
+- Docker: `docker compose up -d --build` → production build on **http://192.168.101.225:3053** (bind IP = `BIND_IP` in `.env`; `Dockerfile`, `docker-compose.yml`; reads `.env`, data in volume `itam-data`, `MSSQL_SERVER` defaults to `host.docker.internal` — override with `DOCKER_MSSQL_SERVER`).
 - Port is **3093** (override with `PORT`). Listens on `0.0.0.0` so phones on the LAN can open QR links.
 - Default login after seed: `admin / Admin@1234` (Admin), `staff / Staff@1234` (IT Staff), `viewer / Viewer@1234` (Viewer)
 - Requires Node ≥ 22.13 (uses built-in `node:sqlite`, no native modules).

@@ -1,0 +1,26 @@
+# docker compose up -d --build   →   http://192.168.101.225:3053
+# DB settings (DB_CLIENT, MSSQL_*) and COOKIE_SECURE are read from .env if present; PORT is fixed to 3053 here.
+services:
+  itam:
+    build: .
+    image: it-store-itam:latest
+    container_name: itam
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP:-192.168.101.225}:3053:3053"   # listen only on this server IP (set BIND_IP in .env to change)
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3053
+      TZ: Asia/Bangkok
+      # "localhost" inside the container is the container itself; reach SQL Server on the Docker host instead
+      MSSQL_SERVER: ${DOCKER_MSSQL_SERVER:-host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - itam-data:/app/data  # SQLite DB + uploads
+
+volumes:
+  itam-data:
