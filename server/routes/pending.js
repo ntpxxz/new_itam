@@ -10,6 +10,8 @@ import { createReceiveDoc } from './documents.js';
 // history and audit follow the same rules as the รับเข้า page. Lines match items by SKU at read time.
 // Incomplete lines (no SKU / quantity) are kept too, so they can be fixed on the page instead of re-uploading.
 // ลบ = soft delete (deleted_at): the line disappears from every tab; received lines belong to a slip and stay.
+// Approved ใบสั่งซื้อ lines land here too (order_line_id): consumables match by SKU like any line; per-unit asset
+// lines have no SKU and create new asset units (category/name/brand/model from the order line) when received.
 const r = Router();
 
 const MATCH = `
@@ -17,14 +19,18 @@ const MATCH = `
 const LIST = `
   SELECT p.id, p.batch_id, p.line_no, p.sku, p.name, p.qty, p.unit_cost, p.status, p.doc_id, p.created_at, p.closed_at, p.deleted_at,
          b.file_name, b.note AS batch_note, u.full_name AS created_by_name, cu.full_name AS closed_by_name, d.doc_no,
-         x.id AS item_id, x.name AS item_name, x.unit, x.qty_on_hand, x.unit_cost AS item_unit_cost,
+         x.id AS item_id, x.name AS item_name, x.unit, x.qty_on_hand, x.unit_cost AS item_unit_cost, p.order_line_id,
+         ol.kind AS order_kind, ol.category_id AS order_category_id, ol.brand AS order_brand, ol.model AS order_model,
+         o.id AS order_id, o.order_no,
          CASE WHEN x.id IS NULL AND EXISTS (SELECT 1 FROM assets a WHERE (a.asset_tag = p.sku COLLATE NOCASE OR a.serial_no = p.sku) AND a.deleted_at IS NULL)
               THEN 1 ELSE 0 END AS is_asset
   FROM pending_receipts p
   JOIN pending_batches b ON b.id = p.batch_id
   LEFT JOIN users u ON u.id = p.created_by
   LEFT JOIN users cu ON cu.id = p.closed_by
-  LEFT JOIN documents d ON d.id = p.doc_id ${MATCH}`;
+  LEFT JOIN documents d ON d.id = p.doc_id
+  LEFT JOIN order_lines ol ON ol.id = p.order_line_id
+  LEFT JOIN orders o ON o.id = ol.order_id ${MATCH}`;
 
 const STATUSES = ['pending', 'received', 'cancelled'];
 const SKU_RULE = 'SKU ต้องไม่มีช่องว่าง และยาวไม่เกิน 64 ตัวอักษร';
@@ -32,6 +38,7 @@ const SKU_RULE = 'SKU ต้องไม่มีช่องว่าง แล
 // state of a pending line: ready (matches a consumable) · new (SKU not in the system yet) · incomplete (problem says why)
 function withState(x) {
   if (!x) return x;
+  if (x.order_kind === 'asset') return { ...x, problem: x.qty ? null : 'ไม่มีจำนวน', state: x.qty ? 'ready' : 'incomplete' };
   const problem = !x.sku ? 'ไม่มีบาร์โค้ด/SKU'
     : /\s/.test(x.sku) ? SKU_RULE
     : !x.qty ? 'ไม่มีจำนวน'
@@ -46,8 +53,8 @@ r.get('/', requirePerm('consumable.view'), async (req, res) => {
   const status = STATUSES.includes(req.query.status) ? req.query.status : 'pending';
   const w = ['p.status = ?', 'p.deleted_at IS NULL']; const p = [status];
   if (req.query.q) {
-    w.push(`(p.sku LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR x.name LIKE ? ESCAPE '\\' OR b.file_name LIKE ? ESCAPE '\\')`);
-    p.push(...Array(4).fill(likeTerm(req.query.q)));
+    w.push(`(p.sku LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR x.name LIKE ? ESCAPE '\\' OR b.file_name LIKE ? ESCAPE '\\' OR o.order_no LIKE ? ESCAPE '\\')`);
+    p.push(...Array(5).fill(likeTerm(req.query.q)));
   }
   const rows = (await all(`${LIST} WHERE ${w.join(' AND ')} ORDER BY p.batch_id DESC, p.line_no, p.id LIMIT 2000`, ...p)).map(withState);
   const counts = Object.fromEntries((await all('SELECT status, COUNT(*) n FROM pending_receipts WHERE deleted_at IS NULL GROUP BY status')).map((c) => [c.status, c.n]));
@@ -96,6 +103,7 @@ r.put('/:id', requirePerm('consumable.move'), async (req, res) => {
   if (before.status !== 'pending') throw bad('รายการนี้รับเข้าหรือยกเลิกไปแล้ว แก้ไขไม่ได้');
   const body = req.body || {};
   const v = { sku: before.sku, name: before.name, qty: before.qty, unit_cost: before.unit_cost };
+  if (body.sku !== undefined && before.order_line_id) throw bad('รายการจากใบสั่งซื้อแก้บาร์โค้ด/SKU ไม่ได้ — แก้ได้เฉพาะจำนวนและราคา');
   if (body.sku !== undefined) {
     v.sku = String(body.sku ?? '').trim();
     if (!v.sku) throw bad('กรุณากรอกบาร์โค้ด/SKU');
@@ -142,11 +150,15 @@ r.post('/receive', requirePerm('consumable.move'), async (req, res) => {
     if (missing.length) {
       throw bad(`${missing.length} รายการยังไม่มีในระบบ (${missing.slice(0, 3).map((x) => x.sku).join(', ')}${missing.length > 3 ? ', …' : ''}) — สร้างรายการใหม่ก่อน หรือเอาเครื่องหมายออก`);
     }
-    const files = [...new Set(rows.map((x) => x.file_name).filter(Boolean))];
+    const sources = [...new Set(rows.map((x) => x.order_no || x.file_name).filter(Boolean))];
+    const orders = [...new Set(rows.map((x) => x.order_no).filter(Boolean))];
     const doc = await createReceiveDoc(req, {
-      doc_date: b.doc_date, vendor_id: b.vendor_id, location_id: b.location_id, po_number: b.po_number, invoice_number: b.invoice_number,
-      note: b.note || (files.length ? `จากรายการรอรับเข้า: ${files.join(', ')}` : 'จากรายการรอรับเข้า'),
-      lines: rows.map((x) => ({ kind: 'consumable', consumable_id: x.item_id, qty: x.qty, unit_cost: x.unit_cost ?? x.item_unit_cost })),
+      doc_date: b.doc_date, vendor_id: b.vendor_id, location_id: b.location_id, invoice_number: b.invoice_number,
+      po_number: b.po_number || (orders.length === 1 ? orders[0] : null),
+      note: b.note || (sources.length ? `จากรายการรอรับเข้า: ${sources.join(', ')}` : 'จากรายการรอรับเข้า'),
+      lines: rows.map((x) => (x.order_kind === 'asset'
+        ? { kind: 'asset', category_id: x.order_category_id, name: x.name, brand: x.order_brand || null, model: x.order_model || null, qty: x.qty, unit_price: x.unit_cost }
+        : { kind: 'consumable', consumable_id: x.item_id, qty: x.qty, unit_cost: x.unit_cost ?? x.item_unit_cost })),
     });
     await run(`UPDATE pending_receipts SET status = 'received', doc_id = ?, closed_by = ?, closed_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
       doc.id, req.user.id, now(), ...ids);

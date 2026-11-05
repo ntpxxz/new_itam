@@ -104,14 +104,16 @@ available ──transfer──▶ available (location/department move)
 ### รายการรอรับเข้า (pending receipts) — `server/routes/pending.js` (`/api/pending-receipts`), page `/pending-receive`
 - Upload a CSV (browser parses it in `client/src/csv.js`: Barcode/SKU + Quantity required; Name, Unit Price optional; UTF-8/UTF-16/Windows-874) → rows are stored in `pending_batches` / `pending_receipts` (status `pending`). **Uploading never changes stock.**
 - Every non-empty row is kept. Each line's `state` is computed when listed: `ready` (SKU matches a consumable) · `new` (SKU not in the system → "สร้างรายการใหม่" dialog on the page creates the consumable with stock 0, or the full form `/assets/new?sku=&name=&unit_cost=`) · `incomplete` (no SKU, SKU with spaces, no qty, or an existing per-unit asset; `problem` says why). SKU/qty/price are edited in the row; only `ready` lines can be received.
+- Approved ใบสั่งซื้อ lines arrive here too (`order_line_id`, shown with the order no.): consumables match by SKU; per-unit asset lines (no SKU) are always ready and create new asset units on receipt (needs `asset.create`). Their SKU can't be edited; qty/price can.
 - Anyone with `consumable.move` can come back later, tick ready lines and receive them: one RCV slip via `createReceiveDoc()` (shared with `/receive`), then the lines become `received` with `doc_id`, in the same transaction. Lines can be edited (SKU/qty/price) or `cancelled` while pending; ลบ soft-deletes pending/cancelled lines (`deleted_at`, hidden from every tab, audited) — received lines can't be deleted. Sidebar badge `pendingReceive`.
 
 ### ใบสั่งซื้อ (purchase orders / cart) — `server/routes/orders.js` (`/api/orders`), pages `/shop`, `/cart`, `/orders`, `/orders/:id`
 - A **purchase order**, not a requisition: a user with `order.create` (role **ผู้สั่งซื้อ**, key `requester`, has only this) picks any **registered** item into a cart on `/shop` — **stock level never limits it** (0 is fine; per line ≤ 9999, assets ≤ 200). Reviews it on `/cart` (recipient, note, estimate from last price; topbar cart icon shows the count; cart = `client/src/cart.js`, localStorage) and sends `ORD-YYYYMM-0001` (`pending`). Unregistered items can't be ordered.
 - Catalog (`GET /api/orders/catalog`) = all consumables + per-unit assets grouped by category/name/brand/model (non-scrapped), with `on_hand` (info only) and `last_price`. Lines store that group plus `unit_price`.
-- Flow (`order.manage`): approve (may lower quantities, 0 = not approved) or reject (reason required) → **รับของ** `POST /:id/receive`: one RCV slip via `createReceiveDoc()` (prices per line, vendor, location, PO no. defaults to the order no.; consumables stock in, assets created per unit) → **ส่งมอบ** `POST /:id/deliver`: one ISS slip via `createIssueDoc()` using exactly the asset units that RCV created. Each step is one transaction and audited. Receiving/delivering also needs `asset.create`/`consumable.move` and `asset.transact` (the slip rules apply).
-- Stage = `status`, except `approved` + `receive_doc_id` is shown as `received` (รับของแล้ว · รอส่งมอบ) — no extra status value, so the CHECK constraint didn't change. Cancel: requester while `pending`, managers also while `approved`; never after receiving.
-- Users without `order.manage` see only their own orders. Sidebar badge `pendingOrders` (managers: pending + approved incl. received; requesters: own received, awaiting pickup).
+- `order.manage` approves (may lower quantities, 0 = not approved) or rejects (reason required). **Approving moves the approved lines to รายการรอรับเข้า**: one `pending_batches` row (note `ใบสั่งซื้อ ORD-…`) + one `pending_receipts` row per line with `order_line_id`, same transaction. The goods are received only there (normal RCV slip; PO no. defaults to the order no.). Orders have no receive/deliver step of their own; handing goods to the requester is a normal เบิกออก.
+- Order tabs: ทั้งหมด / รอตรวจสอบ / อนุมัติแล้ว / ไม่อนุมัติ / ยกเลิก. The order page shows each line's receipt state (รอรับเข้า / รับเข้าแล้ว + RCV no. / ยกเลิก). Cancel: requester while `pending`; managers also while `approved` if no line was received yet — its waiting lines are cancelled too.
+- Old databases may hold `delivered` orders and unused `orders.received_by/received_at/receive_doc_id` columns from an earlier version; `delivered_*` / `doc_id` are only read for display.
+- Users without `order.manage` see only their own orders. Sidebar badge `pendingOrders` = orders waiting for approval (managers); approved lines count in `pendingReceive`.
 - `db.js` turns `''` params into NULL, so `brand`/`model` (NOT NULL DEFAULT '') are written and matched with `COALESCE(?, '')`.
 
 ### Recipients: free text name + แผนก — `server/recipient.js`
@@ -204,7 +206,7 @@ available ──transfer──▶ available (location/department move)
 ### Phase 3
 - [x] Stock count sessions: scan per location → summary of found / missing / unexpected
 - [x] Chat assistant (rule-based): type a receive/issue/borrow request → reviewed draft slip → บันทึก
-- [x] ใบสั่งซื้อ: end-user cart (any stock level) → admin approve/reject → รับของ (RCV) → ส่งมอบ (ISS)
+- [x] ใบสั่งซื้อ: end-user cart (any stock level) → admin approve/reject → approved lines go to รอรับเข้า → RCV slip
 - [ ] Self-service borrow requests (due date) through the same approval flow
 - [ ] Email/LINE notifications for overdue & warranty
 - [ ] 2FA, AD/SSO

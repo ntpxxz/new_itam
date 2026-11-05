@@ -90,7 +90,7 @@ export default function PendingReceive() {
   const edit = pending && canMove;
   return (
     <>
-      <PageHeader title="รายการรอรับเข้า" sub="อัปโหลดไฟล์รายการของที่จะเข้า แล้วกลับมาเลือกรับเข้าเมื่อของมาถึง — สต็อกจะอัปเดตเมื่อกด “รับเข้า” เท่านั้น">
+      <PageHeader title="รายการรอรับเข้า" sub="ใบสั่งซื้อที่อนุมัติแล้ว และไฟล์รายการของที่จะเข้า รออยู่ที่นี่ — เลือกรับเข้าเมื่อของมาถึง สต็อกจะอัปเดตเมื่อกด “รับเข้า” เท่านั้น">
         {pending && canMove && (
           <button className="btn btn-primary" onClick={() => setReceiveOpen(true)} disabled={!chosenReady.length}>
             <PackageCheck size={16} />รับเข้าที่เลือก{chosenReady.length ? ` (${chosenReady.length})` : ''}
@@ -107,7 +107,7 @@ export default function PendingReceive() {
           ]} />
           <div className="input-icon" style={{ flex: '1 1 220px' }}>
             <Search size={16} aria-hidden />
-            <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา SKU, ชื่อ, ชื่อไฟล์" aria-label="ค้นหารายการรอรับเข้า" />
+            <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา SKU, ชื่อ, ชื่อไฟล์, เลขใบสั่งซื้อ" aria-label="ค้นหารายการรอรับเข้า" />
           </div>
           {canMove && (
             <>
@@ -182,16 +182,21 @@ export default function PendingReceive() {
                       )}
                       <td style={{ minWidth: 220 }}>
                         {r.item_id ? <Link to={`/consumables/${r.item_id}`} className="cell-main">{r.item_name}</Link> : <div className="cell-main">{r.name || '—'}</div>}
-                        {edit && r.state !== 'ready' ? (
+                        {edit && r.state !== 'ready' && !r.order_line_id ? (
                           <input className="input mono" style={{ marginTop: 4, maxWidth: 220 }} defaultValue={r.sku ?? ''} key={`s${r.id}-${r.sku}`}
                             placeholder="บาร์โค้ด/SKU" aria-label={`บาร์โค้ด/SKU แถว ${r.line_no ?? ''}`}
                             onBlur={(e) => { const v = e.target.value.trim(); if (v !== (r.sku ?? '')) saveLine(r, { sku: v }); }} />
+                        ) : r.order_kind === 'asset' ? (
+                          <div className="cell-sub">{['รายชิ้น · สร้างเครื่องใหม่เมื่อรับเข้า', r.order_brand, r.order_model].filter(Boolean).join(' · ')}</div>
                         ) : (
                           <div className="tag">{r.sku}{r.item_id && r.name && r.name.toLowerCase() !== r.item_name.toLowerCase() ? ` · ในไฟล์: ${r.name}` : ''}</div>
                         )}
                       </td>
                       <td>
-                        <div className="cell-sub">{r.file_name || '—'}{r.line_no ? ` · แถว ${r.line_no}` : ''}</div>
+                        <div className="cell-sub">
+                          {r.order_id ? <Link to={`/orders/${r.order_id}`} className="mono">{r.order_no}</Link> : r.file_name || '—'}
+                          {r.line_no ? ` · ${r.order_id ? 'รายการ' : 'แถว'} ${r.line_no}` : ''}
+                        </div>
                         <div className="cell-sub">{fmtDateTime(r.created_at)} · {r.created_by_name}</div>
                       </td>
                       <td className="text-right mono">{r.item_id ? `${fmtNum(r.qty_on_hand)} ${r.unit}` : '—'}</td>

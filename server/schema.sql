@@ -241,14 +241,16 @@ CREATE TABLE IF NOT EXISTS pending_receipts (
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   closed_by   INTEGER REFERENCES users(id),
   closed_at   TEXT,
-  deleted_at  TEXT
+  deleted_at  TEXT,
+  order_line_id INTEGER REFERENCES order_lines(id)
 );
 CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_receipts(status, batch_id);
 
 -- ใบสั่งซื้อ: a user picks registered items (any stock level) into a cart and orders them (pending). An admin
--- approves (may lower quantities) or rejects. Goods arriving → RCV slip (receive_doc_id, stock in; stage "received"
--- while status stays 'approved'), then handing over → ISS slip (doc_id) and status 'delivered'.
+-- approves (may lower quantities) or rejects. Approving puts every approved line into pending_receipts
+-- (order_line_id); the goods are received there as a normal RCV slip.
 -- A line is a consumable (consumable_id) or a group of per-unit assets with the same category/name/brand/model.
+-- delivered_* / doc_id are kept for orders delivered before receiving moved to รอรับเข้า; new orders don't use them.
 CREATE TABLE IF NOT EXISTS orders (
   id            INTEGER PRIMARY KEY,
   order_no      TEXT UNIQUE NOT NULL,
@@ -261,9 +263,6 @@ CREATE TABLE IF NOT EXISTS orders (
   reviewed_by   INTEGER REFERENCES users(id),
   reviewed_at   TEXT,
   review_note   TEXT,
-  received_by   INTEGER REFERENCES users(id),
-  received_at   TEXT,
-  receive_doc_id INTEGER REFERENCES documents(id),
   delivered_by  INTEGER REFERENCES users(id),
   delivered_at  TEXT,
   doc_id        INTEGER REFERENCES documents(id),

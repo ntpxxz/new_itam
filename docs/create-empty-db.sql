@@ -165,9 +165,6 @@ CREATE TABLE orders (
   reviewed_by   INTEGER REFERENCES users(id),
   reviewed_at   TEXT,
   review_note   TEXT,
-  received_by   INTEGER REFERENCES users(id),
-  received_at   TEXT,
-  receive_doc_id INTEGER REFERENCES documents(id),
   delivered_by  INTEGER REFERENCES users(id),
   delivered_at  TEXT,
   doc_id        INTEGER REFERENCES documents(id),
@@ -196,7 +193,8 @@ CREATE TABLE pending_receipts (
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   closed_by   INTEGER REFERENCES users(id),
   closed_at   TEXT,
-  deleted_at  TEXT
+  deleted_at  TEXT,
+  order_line_id INTEGER REFERENCES order_lines(id)
 );
 
 CREATE TABLE people (

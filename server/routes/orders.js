@@ -2,14 +2,13 @@ import { Router } from 'express';
 import { all, get, run, tx, now } from '../db.js';
 import { requirePerm, can } from '../auth.js';
 import { audit } from '../audit.js';
-import { HttpError, bad, notFound, likeTerm, today, toInt } from './util.js';
-import { createIssueDoc, createReceiveDoc } from './documents.js';
+import { bad, notFound, likeTerm, today, toInt } from './util.js';
 import { resolveRecipient } from '../recipient.js';
 
-// ใบสั่งซื้อ: cart → pending → (admin) approved → goods arrive: RCV slip (stage "received") → handed over: ISS slip (delivered).
-// Only registered items can be ordered, at any stock level. "received" is approved + receive_doc_id (no extra status value).
+// ใบสั่งซื้อ: cart → pending → (admin) approved or rejected. Approving moves the approved lines to รายการรอรับเข้า
+// (pending_receipts.order_line_id), where the goods are received as a normal RCV slip. Any registered item, any stock level.
 const r = Router();
-const STAGES = ['pending', 'approved', 'received', 'delivered', 'rejected', 'cancelled'];
+const STATUSES = ['pending', 'approved', 'rejected', 'cancelled'];
 const ANY = requirePerm('order.create', 'order.manage');
 const MAX_QTY = 9999;
 
@@ -38,17 +37,16 @@ async function nextOrderNo() {
   return base + String(row ? parseInt(row.order_no.slice(base.length), 10) + 1 : 1).padStart(4, '0');
 }
 
-const STAGE = `CASE WHEN o.status = 'approved' AND o.receive_doc_id IS NOT NULL THEN 'received' ELSE o.status END`;
+const RECEIPTS = `SELECT pr.id, pr.status FROM pending_receipts pr JOIN order_lines ol ON ol.id = pr.order_line_id WHERE pr.deleted_at IS NULL`;
 const ORDER_SELECT = `
-  SELECT o.*, ${STAGE} AS stage, p.name AS person_name, dp.name AS department_name, u.full_name AS requested_by_name,
-         ru.full_name AS reviewed_by_name, rc.full_name AS received_by_name, du.full_name AS delivered_by_name,
-         d.doc_no, rd.doc_no AS receive_doc_no,
+  SELECT o.*, p.name AS person_name, dp.name AS department_name, u.full_name AS requested_by_name, ru.full_name AS reviewed_by_name,
          (SELECT COUNT(*) FROM order_lines l WHERE l.order_id = o.id) AS line_count,
-         (SELECT COALESCE(SUM(COALESCE(l.approved_qty, l.qty)), 0) FROM order_lines l WHERE l.order_id = o.id) AS unit_count
+         (SELECT COALESCE(SUM(COALESCE(l.approved_qty, l.qty)), 0) FROM order_lines l WHERE l.order_id = o.id) AS unit_count,
+         (SELECT COUNT(*) FROM pending_receipts pr JOIN order_lines ol ON ol.id = pr.order_line_id
+          WHERE pr.deleted_at IS NULL AND pr.status = 'pending' AND ol.order_id = o.id) AS awaiting_lines
   FROM orders o
   LEFT JOIN people p ON p.id = o.person_id LEFT JOIN departments dp ON dp.id = o.department_id
-  LEFT JOIN users u ON u.id = o.requested_by LEFT JOIN users ru ON ru.id = o.reviewed_by LEFT JOIN users rc ON rc.id = o.received_by
-  LEFT JOIN users du ON du.id = o.delivered_by LEFT JOIN documents d ON d.id = o.doc_id LEFT JOIN documents rd ON rd.id = o.receive_doc_id`;
+  LEFT JOIN users u ON u.id = o.requested_by LEFT JOIN users ru ON ru.id = o.reviewed_by`;
 
 async function loadOrder(req, id) {
   const o = await get(`${ORDER_SELECT} WHERE o.id = ?`, toInt(id));
@@ -98,19 +96,21 @@ r.get('/', ANY, async (req, res) => {
   const w = ['1=1']; const p = [];
   if (!can(req.user, 'order.manage') || req.query.mine === '1') { w.push('o.requested_by = ?'); p.push(req.user.id); }
   const base = [...w]; const baseP = [...p];
-  if (STAGES.includes(req.query.status)) { w.push(`${STAGE} = ?`); p.push(req.query.status); }
+  if (STATUSES.includes(req.query.status)) { w.push('o.status = ?'); p.push(req.query.status); }
   if (req.query.q) { w.push(`(o.order_no LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR dp.name LIKE ? ESCAPE '\\')`); p.push(...Array(3).fill(likeTerm(req.query.q))); }
   const rows = await all(`${ORDER_SELECT} WHERE ${w.join(' AND ')} ORDER BY o.id DESC LIMIT 500`, ...p);
-  const counts = Object.fromEntries((await all(`SELECT x.stage, COUNT(*) n FROM (SELECT ${STAGE} AS stage FROM orders o WHERE ${base.join(' AND ')}) x GROUP BY x.stage`, ...baseP))
-    .map((c) => [c.stage, c.n]));
+  const counts = Object.fromEntries((await all(`SELECT o.status, COUNT(*) n FROM orders o WHERE ${base.join(' AND ')} GROUP BY o.status`, ...baseP))
+    .map((c) => [c.status, c.n]));
   res.json({ rows, counts });
 });
 
 r.get('/:id', ANY, async (req, res) => {
   const order = await loadOrder(req, req.params.id);
   const items = new Map((await catalog()).map((x) => [x.key, x]));
-  const lines = (await all(`SELECT l.*, k.name AS category_name, c.sku AS code, c.unit, c.image_path
+  const lines = (await all(`SELECT l.*, k.name AS category_name, c.sku AS code, c.unit, c.image_path,
+           pr.status AS receipt_status, pr.qty AS receipt_qty, pr.doc_id AS receipt_doc_id, d.doc_no AS receipt_doc_no
     FROM order_lines l LEFT JOIN categories k ON k.id = l.category_id LEFT JOIN consumables c ON c.id = l.consumable_id
+    LEFT JOIN pending_receipts pr ON pr.order_line_id = l.id AND pr.deleted_at IS NULL LEFT JOIN documents d ON d.id = pr.doc_id
     WHERE l.order_id = ? ORDER BY l.id`, order.id)).map((l) => {
     const s = items.get(keyOf(l));
     return { ...l, unit: l.unit || 'เครื่อง', image_path: l.image_path || s?.image_path || null, on_hand: s?.on_hand ?? 0 };
@@ -118,12 +118,19 @@ r.get('/:id', ANY, async (req, res) => {
   res.json({ order, lines });
 });
 
-// Before the goods are received only; afterwards they are in stock and must be handed over or issued normally.
+// Requester: while pending. Managers: also once approved, as long as nothing was received; its waiting lines are cancelled too.
 r.post('/:id/cancel', ANY, async (req, res) => {
   await tx(async () => {
     const o = await loadOrder(req, req.params.id);
-    if (o.stage !== 'pending' && !(o.stage === 'approved' && can(req.user, 'order.manage'))) {
-      throw bad(o.stage === 'received' ? 'รับของเข้าสต็อกแล้ว ยกเลิกไม่ได้ — ส่งมอบ หรือเบิกออกตามปกติ' : 'ยกเลิกได้เฉพาะใบสั่งซื้อที่ยังไม่รับของ');
+    if (o.status !== 'pending' && !(o.status === 'approved' && can(req.user, 'order.manage'))) {
+      throw bad('ยกเลิกได้เฉพาะใบสั่งซื้อที่รอตรวจสอบ หรืออนุมัติแล้วแต่ยังไม่รับเข้า');
+    }
+    if (o.status === 'approved') {
+      if ((await get(`SELECT COUNT(*) n FROM (${RECEIPTS} AND ol.order_id = ? AND pr.status = 'received') x`, o.id)).n) {
+        throw bad('บางรายการรับเข้าสต็อกแล้ว ยกเลิกใบสั่งซื้อไม่ได้ — ยกเลิกรายการที่เหลือได้ที่เมนู “รอรับเข้า”');
+      }
+      await run(`UPDATE pending_receipts SET status = 'cancelled', closed_by = ?, closed_at = ?
+        WHERE status = 'pending' AND order_line_id IN (SELECT id FROM order_lines WHERE order_id = ?)`, req.user.id, now(), o.id);
     }
     await run(`UPDATE orders SET status = 'cancelled', cancelled_at = ? WHERE id = ?`, now(), o.id);
     await audit(req, 'order', o.id, 'cancel', { status: o.status }, { status: 'cancelled', reason: req.body?.reason || null });
@@ -147,7 +154,14 @@ r.post('/:id/approve', requirePerm('order.manage'), async (req, res) => {
     }
     if (!total) throw bad('ต้องอนุมัติอย่างน้อย 1 รายการ — ถ้าไม่อนุมัติทั้งหมด ให้กด “ไม่อนุมัติ”');
     await run(`UPDATE orders SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE id = ?`, req.user.id, now(), req.body?.review_note || null, o.id);
-    await audit(req, 'order', o.id, 'approve', { status: 'pending' }, { status: 'approved', units: total });
+    const batch = Number((await run('INSERT INTO pending_batches (note, created_by) VALUES (?, ?)', `ใบสั่งซื้อ ${o.order_no}`, req.user.id)).lastInsertRowid);
+    const approved = await all(`SELECT l.*, c.sku FROM order_lines l LEFT JOIN consumables c ON c.id = l.consumable_id
+      WHERE l.order_id = ? AND l.approved_qty > 0 ORDER BY l.id`, o.id);
+    for (const [i, l] of approved.entries()) {
+      await run('INSERT INTO pending_receipts (batch_id, line_no, sku, name, qty, unit_cost, created_by, order_line_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        batch, i + 1, l.sku || null, l.name, l.approved_qty, l.unit_price, req.user.id, l.id);
+    }
+    await audit(req, 'order', o.id, 'approve', { status: 'pending' }, { status: 'approved', units: total, pending_batch: batch });
   });
   res.json({ ok: true });
 });
@@ -162,62 +176,6 @@ r.post('/:id/reject', requirePerm('order.manage'), async (req, res) => {
     await audit(req, 'order', o.id, 'reject', { status: 'pending' }, { status: 'rejected', review_note: note });
   });
   res.json({ ok: true });
-});
-
-// Goods arrived: one RCV slip for the approved quantities (stock in / new asset units).
-// body: { doc_date, purchase_date, vendor_id, location_id, po_number, invoice_number, note, lines: [{ id, unit_price }] }
-r.post('/:id/receive', requirePerm('order.manage'), async (req, res) => {
-  const b = req.body || {};
-  const result = await tx(async () => {
-    const o = await loadOrder(req, req.params.id);
-    if (o.stage !== 'approved') throw bad(o.stage === 'received' ? 'ใบสั่งซื้อนี้รับของแล้ว' : 'รับของได้เฉพาะใบสั่งซื้อที่อนุมัติแล้ว');
-    const prices = new Map((Array.isArray(b.lines) ? b.lines : []).map((l) => [toInt(l.id), l.unit_price]));
-    const docLines = [];
-    for (const [i, l] of (await all('SELECT * FROM order_lines WHERE order_id = ? AND approved_qty > 0 ORDER BY id', o.id)).entries()) {
-      const raw = prices.has(l.id) ? prices.get(l.id) : l.unit_price;
-      const price = raw === '' || raw == null ? null : Number(raw);
-      if (price != null && !(price >= 0)) throw bad(`รายการที่ ${i + 1}: ราคาต่อหน่วยไม่ถูกต้อง`);
-      await run('UPDATE order_lines SET unit_price = ? WHERE id = ?', price, l.id);
-      docLines.push(l.kind === 'consumable'
-        ? { kind: 'consumable', consumable_id: l.consumable_id, qty: l.approved_qty, unit_cost: price }
-        : { kind: 'asset', category_id: l.category_id, name: l.name, brand: l.brand || null, model: l.model || null, qty: l.approved_qty, unit_price: price });
-    }
-    const doc = await createReceiveDoc(req, {
-      doc_date: b.doc_date || today(), purchase_date: b.purchase_date || null, vendor_id: b.vendor_id, location_id: b.location_id,
-      po_number: b.po_number || o.order_no, invoice_number: b.invoice_number,
-      note: [`ใบสั่งซื้อ ${o.order_no}`, b.note].filter(Boolean).join(' · '), lines: docLines,
-    });
-    await run('UPDATE orders SET received_by = ?, received_at = ?, receive_doc_id = ? WHERE id = ?', req.user.id, now(), doc.id, o.id);
-    await audit(req, 'order', o.id, 'receive', { stage: 'approved' }, { stage: 'received', doc_no: doc.doc_no });
-    return doc;
-  });
-  res.status(201).json(result);
-});
-
-// Hand the received goods to the requester: one ISS slip; asset lines take the units created by this order's RCV slip.
-r.post('/:id/deliver', requirePerm('order.manage'), async (req, res) => {
-  const result = await tx(async () => {
-    const o = await loadOrder(req, req.params.id);
-    if (o.stage !== 'received') throw bad(o.stage === 'approved' ? 'ต้องรับของเข้าก่อน จึงจะส่งมอบได้' : 'ส่งมอบได้เฉพาะใบสั่งซื้อที่รับของแล้ว');
-    const docLines = [];
-    for (const l of await all('SELECT * FROM order_lines WHERE order_id = ? AND approved_qty > 0 ORDER BY id', o.id)) {
-      if (l.kind === 'consumable') { docLines.push({ kind: 'consumable', consumable_id: l.consumable_id, qty: l.approved_qty }); continue; }
-      const units = await all(`SELECT a.id FROM assets a WHERE a.deleted_at IS NULL AND a.status = 'available' AND a.category_id = ? AND a.name = ?
-        AND COALESCE(a.brand, '') = COALESCE(?, '') AND COALESCE(a.model, '') = COALESCE(?, '')
-        AND a.id IN (SELECT t.asset_id FROM asset_transactions t WHERE t.doc_id = ?) ORDER BY a.id LIMIT ?`,
-      l.category_id, l.name, l.brand, l.model, o.receive_doc_id, l.approved_qty);
-      if (units.length < l.approved_qty) throw new HttpError(400, `${l.name}: เครื่องที่รับเข้าจากใบสั่งซื้อนี้พร้อมใช้เหลือ ${units.length} จาก ${l.approved_qty} เครื่อง — ตรวจสอบสถานะเครื่องก่อนส่งมอบ`);
-      for (const u of units) docLines.push({ kind: 'asset', asset_id: u.id });
-    }
-    const doc = await createIssueDoc(req, {
-      mode: 'issue', doc_date: req.body?.doc_date || today(), person_name: o.person_name, department_name: o.department_name,
-      note: [`ใบสั่งซื้อ ${o.order_no}`, req.body?.note || o.note].filter(Boolean).join(' · '), lines: docLines,
-    });
-    await run(`UPDATE orders SET status = 'delivered', delivered_by = ?, delivered_at = ?, doc_id = ? WHERE id = ?`, req.user.id, now(), doc.id, o.id);
-    await audit(req, 'order', o.id, 'deliver', { stage: 'received' }, { status: 'delivered', doc_no: doc.doc_no });
-    return doc;
-  });
-  res.status(201).json(result);
 });
 
 export default r;
