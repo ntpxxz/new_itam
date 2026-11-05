@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CheckCircle2, XCircle, Package, Laptop, Ban, ClipboardList } from 'lucide-react';
+import { CheckCircle2, XCircle, Package, Laptop, Ban, ClipboardList, PackageCheck } from 'lucide-react';
 import { useApi } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
@@ -9,7 +9,7 @@ import { PageHeader, Card, Loading, Empty, Modal, Field, Confirm, Chip } from '.
 import { OrderChip } from './Orders.jsx';
 import { fmtDateTime, fmtMoney, fmtNum } from '../format.js';
 
-// ใบสั่งซื้อ: pending → approve (lines move to รอรับเข้า) / reject.
+// ใบสั่งซื้อ: pending → approve (lines move to รอรับเข้า) / reject → handover on /issue?order= once received.
 export default function OrderDetail() {
   const { id } = useParams();
   const { can } = useAuth();
@@ -31,6 +31,7 @@ export default function OrderDetail() {
   const reviewing = manage && o.status === 'pending';
   const received = lines.some((l) => l.receipt_status === 'received');
   const canCancel = o.status === 'pending' || (manage && o.status === 'approved' && !received);
+  const canHandover = manage && o.status === 'approved' && received && !o.awaiting_lines && (can('consumable.move') || can('asset.transact'));
   const approveTotal = lines.reduce((s, l) => s + (parseInt(qty[l.id], 10) || 0), 0);
   const showApproved = o.status !== 'pending';
   const tracked = lines.some((l) => l.receipt_status);
@@ -68,6 +69,9 @@ export default function OrderDetail() {
         )}
         {o.status === 'approved' && o.awaiting_lines > 0 && can('consumable.view') && (
           <Link to="/pending-receive" className="btn"><ClipboardList size={16} />ไปที่รอรับเข้า</Link>
+        )}
+        {canHandover && (
+          <Link to={`/issue?order=${o.id}`} className="btn btn-primary"><PackageCheck size={16} />ส่งมอบให้ผู้สั่ง</Link>
         )}
       </PageHeader>
 
@@ -144,6 +148,10 @@ export default function OrderDetail() {
               <dd>{fmtDateTime(o.reviewed_at)}<div className="cell-sub">{o.reviewed_by_name}</div></dd>
             </>}
             {o.review_note && <><dt>เหตุผล / หมายเหตุ</dt><dd>{o.review_note}</dd></>}
+            {o.delivered_at && <>
+              <dt>ส่งมอบ</dt>
+              <dd>{fmtDateTime(o.delivered_at)}<div className="cell-sub">{o.delivered_by_name}{o.handover_doc_no && <> · {docLink(o.doc_id, o.handover_doc_no)}</>}</div></dd>
+            </>}
             {o.cancelled_at && <><dt>ยกเลิก</dt><dd>{fmtDateTime(o.cancelled_at)}</dd></>}
           </dl>
         </Card>

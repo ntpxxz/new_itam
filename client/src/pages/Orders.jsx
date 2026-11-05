@@ -38,7 +38,7 @@ export default function Orders() {
   const n = (k) => (counts[k] ? ` (${counts[k]})` : '');
   return (
     <>
-      <PageHeader title="ใบสั่งซื้อ" sub={manage ? 'ตรวจสอบและอนุมัติ — รายการที่อนุมัติจะไปอยู่ที่เมนู “รอรับเข้า” เพื่อรับของเข้าสต็อก' : 'ใบสั่งซื้อของคุณและสถานะล่าสุด'}>
+      <PageHeader title="ใบสั่งซื้อ" sub={manage ? 'ตรวจสอบและอนุมัติ → รับของที่เมนู “รอรับเข้า” → ส่งมอบให้ผู้สั่ง (ใบเบิก)' : 'ใบสั่งซื้อของคุณและสถานะล่าสุด'}>
         {can('order.create') && <Link to="/shop" className="btn btn-primary"><ShoppingCart size={16} />สั่งซื้อสินค้า</Link>}
       </PageHeader>
       <Card noBody>
@@ -80,7 +80,7 @@ export default function Orders() {
                     </td>
                     <td>
                       <OrderChip status={o.status} />
-                      {o.status === 'approved' && o.awaiting_lines > 0 && <div className="cell-sub">รอรับเข้า {o.awaiting_lines} รายการ</div>}
+                      {o.status === 'approved' && <div className="cell-sub">{o.awaiting_lines > 0 ? `รอรับเข้า ${o.awaiting_lines} รายการ` : 'รับเข้าครบ · รอส่งมอบ'}</div>}
                     </td>
                   </tr>
                 ))}

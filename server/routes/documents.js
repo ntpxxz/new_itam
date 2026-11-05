@@ -97,7 +97,7 @@ r.post('/issue', requirePerm('asset.transact', 'consumable.move'), async (req, r
   res.status(201).json(await createIssueDoc(req, req.body || {}));
 });
 
-// Also used by คำสั่งเบิก (orders.js) when an approved order is delivered, inside its own transaction.
+// Also used by ใบสั่งซื้อ handover (orders.js), inside its own transaction.
 export async function createIssueDoc(req, b) {
   const lines = Array.isArray(b.lines) ? b.lines : [];
   if (!lines.length) throw bad('กรุณาเพิ่มอย่างน้อย 1 รายการ');

@@ -110,9 +110,10 @@ available ──transfer──▶ available (location/department move)
 ### ใบสั่งซื้อ (purchase orders / cart) — `server/routes/orders.js` (`/api/orders`), pages `/shop`, `/cart`, `/orders`, `/orders/:id`
 - A **purchase order**, not a requisition: a user with `order.create` (role **ผู้สั่งซื้อ**, key `requester`, has only this) picks any **registered** item into a cart on `/shop` — **stock level never limits it** (0 is fine; per line ≤ 9999, assets ≤ 200). Reviews it on `/cart` (recipient, note, estimate from last price; topbar cart icon shows the count; cart = `client/src/cart.js`, localStorage) and sends `ORD-YYYYMM-0001` (`pending`). Unregistered items can't be ordered.
 - Catalog (`GET /api/orders/catalog`) = all consumables + per-unit assets grouped by category/name/brand/model (non-scrapped), with `on_hand` (info only) and `last_price`. Lines store that group plus `unit_price`.
-- `order.manage` approves (may lower quantities, 0 = not approved) or rejects (reason required). **Approving moves the approved lines to รายการรอรับเข้า**: one `pending_batches` row (note `ใบสั่งซื้อ ORD-…`) + one `pending_receipts` row per line with `order_line_id`, same transaction. The goods are received only there (normal RCV slip; PO no. defaults to the order no.). Orders have no receive/deliver step of their own; handing goods to the requester is a normal เบิกออก.
-- Order tabs: ทั้งหมด / รอตรวจสอบ / อนุมัติแล้ว / ไม่อนุมัติ / ยกเลิก. The order page shows each line's receipt state (รอรับเข้า / รับเข้าแล้ว + RCV no. / ยกเลิก). Cancel: requester while `pending`; managers also while `approved` if no line was received yet — its waiting lines are cancelled too.
-- Old databases may hold `delivered` orders and unused `orders.received_by/received_at/receive_doc_id` columns from an earlier version; `delivered_*` / `doc_id` are only read for display.
+- `order.manage` approves (may lower quantities, 0 = not approved) or rejects (reason required). **Approving moves the approved lines to รายการรอรับเข้า**: one `pending_batches` row (note `ใบสั่งซื้อ ORD-…`) + one `pending_receipts` row per line with `order_line_id`, same transaction. The goods are received only there (normal RCV slip; PO no. defaults to the order no.).
+- **Handover (ส่งมอบ)**: once no line still waits in รอรับเข้า, a manager presses ส่งมอบให้ผู้สั่ง → `/issue?order=<id>` pre-filled from `GET /api/orders/:id/handover` (order recipient; received consumables capped at stock; the asset units that line's RCV created, still available; `short` lists anything missing). Lines stay editable. Saving posts to `POST /api/orders/:id/handover` → `createIssueDoc()` (mode always `issue`) and marks the order `delivered` (`delivered_by/at`, `doc_id` = the ISS slip) in one transaction.
+- Order tabs: ทั้งหมด / รอตรวจสอบ / อนุมัติแล้ว / ไม่อนุมัติ / ยกเลิก (delivered orders show under ทั้งหมด; `?status=delivered` works in the API). The order page shows each line's receipt state (รอรับเข้า / รับเข้าแล้ว + RCV no. / ยกเลิก). Cancel: requester while `pending`; managers also while `approved` if no line was received yet — its waiting lines are cancelled too.
+- Old databases may hold unused `orders.received_by/received_at/receive_doc_id` columns from an earlier version.
 - Users without `order.manage` see only their own orders. Sidebar badge `pendingOrders` = orders waiting for approval (managers); approved lines count in `pendingReceive`.
 - `db.js` turns `''` params into NULL, so `brand`/`model` (NOT NULL DEFAULT '') are written and matched with `COALESCE(?, '')`.
 
@@ -207,18 +208,18 @@ available ──transfer──▶ available (location/department move)
 - [x] Stock count sessions: scan per location → summary of found / missing / unexpected
 - [x] Chat assistant (rule-based, offline): type a receive/issue/borrow request → reviewed draft slip → บันทึก
 - [x] รายการรอรับเข้า: CSV upload → pending lines → receive later as one RCV slip
-- [x] ใบสั่งซื้อ: end-user cart (any stock level) → admin approve/reject → approved lines go to รอรับเข้า → RCV slip
+- [x] ใบสั่งซื้อ: end-user cart (any stock level) → admin approve/reject → approved lines go to รอรับเข้า → RCV slip → ส่งมอบ (ISS slip)
 - [x] Consumable SKU = barcode · item photos · opening stock import (`import-stock`)
 - [x] SQL Server driver + `migrate:mssql` · Docker deployment
 
 ### Before merging to main (verification debt)
-- [ ] Click through `/shop` → `/cart` → `/orders/:id` (approve / reject / cancel) → `/pending-receive` → RCV in a browser, desktop + 460px phone width
+- [ ] Click through `/shop` → `/cart` → `/orders/:id` (approve / reject / cancel) → `/pending-receive` → RCV → ส่งมอบ in a browser, desktop + 460px phone width
 - [ ] Run order approve + receive on SQL Server (a scratch database, never the live one), incl. an older DB with `delivered` orders
 - [ ] Regenerate `docs/create-empty-db.mssql.sql` (out of date)
 
 ### Phase 4 — next, in priority order
 Prefer free / offline options (no paid APIs, intranet only).
-1. [ ] **Hand over a received order** — button on `/orders/:id` once all lines are received: opens `/issue` pre-filled with the order's recipient + lines (a normal ISS slip, linked back to the order). Today this is a manual เบิกออก.
+1. [x] **Hand over a received order** — `/orders/:id` → `/issue?order=` pre-filled → ISS slip, order `delivered`.
 2. [ ] **Requester notifications in-app** — bell in the topbar: order approved / rejected / received. Stored in a `notifications` table; no external service.
 3. [ ] **Self-service borrow requests** — same cart + approval flow with mode `borrow` and a due date; approval runs `applyAction('borrow')` via `createIssueDoc`.
 4. [ ] **Overdue & warranty reminders** — daily job (like the PDPA purge) → in-app list first; optional email through the organisation's own SMTP. (LINE Notify was shut down in 2025; LINE would need the Messaging API.)

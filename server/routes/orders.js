@@ -2,13 +2,15 @@ import { Router } from 'express';
 import { all, get, run, tx, now } from '../db.js';
 import { requirePerm, can } from '../auth.js';
 import { audit } from '../audit.js';
-import { bad, notFound, likeTerm, today, toInt } from './util.js';
+import { HttpError, bad, notFound, likeTerm, today, toInt } from './util.js';
 import { resolveRecipient } from '../recipient.js';
+import { createIssueDoc } from './documents.js';
 
 // ใบสั่งซื้อ: cart → pending → (admin) approved or rejected. Approving moves the approved lines to รายการรอรับเข้า
 // (pending_receipts.order_line_id), where the goods are received as a normal RCV slip. Any registered item, any stock level.
+// Once no line is still waiting there, a manager hands the goods over with a normal ISS slip → delivered.
 const r = Router();
-const STATUSES = ['pending', 'approved', 'rejected', 'cancelled'];
+const STATUSES = ['pending', 'approved', 'delivered', 'rejected', 'cancelled'];
 const ANY = requirePerm('order.create', 'order.manage');
 const MAX_QTY = 9999;
 
@@ -40,18 +42,52 @@ async function nextOrderNo() {
 const RECEIPTS = `SELECT pr.id, pr.status FROM pending_receipts pr JOIN order_lines ol ON ol.id = pr.order_line_id WHERE pr.deleted_at IS NULL`;
 const ORDER_SELECT = `
   SELECT o.*, p.name AS person_name, dp.name AS department_name, u.full_name AS requested_by_name, ru.full_name AS reviewed_by_name,
+         hd.doc_no AS handover_doc_no, du.full_name AS delivered_by_name,
          (SELECT COUNT(*) FROM order_lines l WHERE l.order_id = o.id) AS line_count,
          (SELECT COALESCE(SUM(COALESCE(l.approved_qty, l.qty)), 0) FROM order_lines l WHERE l.order_id = o.id) AS unit_count,
          (SELECT COUNT(*) FROM pending_receipts pr JOIN order_lines ol ON ol.id = pr.order_line_id
           WHERE pr.deleted_at IS NULL AND pr.status = 'pending' AND ol.order_id = o.id) AS awaiting_lines
   FROM orders o
   LEFT JOIN people p ON p.id = o.person_id LEFT JOIN departments dp ON dp.id = o.department_id
-  LEFT JOIN users u ON u.id = o.requested_by LEFT JOIN users ru ON ru.id = o.reviewed_by`;
+  LEFT JOIN users u ON u.id = o.requested_by LEFT JOIN users ru ON ru.id = o.reviewed_by
+  LEFT JOIN documents hd ON hd.id = o.doc_id LEFT JOIN users du ON du.id = o.delivered_by`;
 
 async function loadOrder(req, id) {
   const o = await get(`${ORDER_SELECT} WHERE o.id = ?`, toInt(id));
   if (!o || (!can(req.user, 'order.manage') && o.requested_by !== req.user.id)) throw notFound('ใบสั่งซื้อ');
   return o;
+}
+
+// What an approved order can hand over now, as item-picker rows: consumables from stock (capped at on hand), and the
+// asset units its RCV slip created that are still available. Refused while any line still waits in รอรับเข้า.
+async function handoverDraft(o) {
+  if (o.status !== 'approved') throw bad('ส่งมอบได้เฉพาะใบสั่งซื้อที่อนุมัติแล้วและยังไม่ส่งมอบ');
+  const lines = await all(`SELECT l.*, pr.status AS receipt_status, pr.qty AS receipt_qty, pr.doc_id AS receipt_doc_id
+    FROM order_lines l JOIN pending_receipts pr ON pr.order_line_id = l.id AND pr.deleted_at IS NULL
+    WHERE l.order_id = ? ORDER BY l.id`, o.id);
+  if (lines.some((l) => l.receipt_status === 'pending')) throw bad('ยังมีรายการรอรับเข้า — รับเข้าให้ครบ (หรือยกเลิกรายการนั้น) ที่เมนู “รอรับเข้า” ก่อนส่งมอบ');
+  const items = [];
+  const short = [];
+  for (const l of lines.filter((x) => x.receipt_status === 'received')) {
+    if (l.kind === 'consumable') {
+      const c = await get(`SELECT 'consumable' AS kind, x.id, x.sku AS code, x.name, x.category_id, k.name AS category_name, x.image_path,
+          x.qty_on_hand, x.unit FROM consumables x JOIN categories k ON k.id = x.category_id WHERE x.id = ? AND x.deleted_at IS NULL`, l.consumable_id);
+      const qty = Math.min(l.receipt_qty, c?.qty_on_hand || 0);
+      if (qty < l.receipt_qty) short.push(`${l.name}: คงเหลือในสต็อก ${c?.qty_on_hand || 0} จาก ${l.receipt_qty} ${c?.unit || ''}`.trim());
+      if (qty > 0) items.push({ item: c, qty });
+    } else {
+      const units = await all(`SELECT 'asset' AS kind, a.id, a.asset_tag AS code, a.name, a.category_id, k.name AS category_name, a.image_path,
+          a.serial_no, a.status
+        FROM asset_transactions t JOIN assets a ON a.id = t.asset_id JOIN categories k ON k.id = a.category_id
+        WHERE t.doc_id = ? AND a.deleted_at IS NULL AND a.status = 'available' AND a.category_id = ? AND a.name = ?
+          AND COALESCE(a.brand, '') = COALESCE(?, '') AND COALESCE(a.model, '') = COALESCE(?, '')
+        ORDER BY a.id LIMIT ?`, l.receipt_doc_id, l.category_id, l.name, l.brand, l.model, l.receipt_qty);
+      if (units.length < l.receipt_qty) short.push(`${l.name}: พร้อมใช้ ${units.length} จาก ${l.receipt_qty} เครื่อง`);
+      items.push(...units.map((u) => ({ item: u, qty: 1 })));
+    }
+  }
+  if (!items.length) throw bad('ไม่มีรายการที่รับเข้าแล้วและพร้อมส่งมอบ');
+  return { items, short };
 }
 
 r.get('/catalog', ANY, async (req, res) => {
@@ -136,6 +172,29 @@ r.post('/:id/cancel', ANY, async (req, res) => {
     await audit(req, 'order', o.id, 'cancel', { status: o.status }, { status: 'cancelled', reason: req.body?.reason || null });
   });
   res.json({ ok: true });
+});
+
+r.get('/:id/handover', requirePerm('order.manage'), async (req, res) => {
+  const o = await loadOrder(req, req.params.id);
+  const { items, short } = await handoverDraft(o);
+  res.json({ order: { id: o.id, order_no: o.order_no, person_name: o.person_name || '', department_name: o.department_name || '' }, items, short });
+});
+
+// body = the /api/documents/issue body (lines may be edited on /issue). Writes the ISS slip and marks the order delivered.
+r.post('/:id/handover', requirePerm('order.manage'), async (req, res) => {
+  const b = req.body || {};
+  const result = await tx(async () => {
+    const o = await loadOrder(req, req.params.id);
+    await handoverDraft(o);
+    if ((Array.isArray(b.lines) ? b.lines : []).some((l) => l.kind === 'asset') && !can(req.user, 'asset.transact')) {
+      throw new HttpError(403, 'คุณไม่มีสิทธิ์เบิกอุปกรณ์รายชิ้น');
+    }
+    const doc = await createIssueDoc(req, { ...b, mode: 'issue', note: b.note || `ส่งมอบตามใบสั่งซื้อ ${o.order_no}` });
+    await run(`UPDATE orders SET status = 'delivered', delivered_by = ?, delivered_at = ?, doc_id = ? WHERE id = ?`, req.user.id, now(), doc.id, o.id);
+    await audit(req, 'order', o.id, 'deliver', { status: 'approved' }, { status: 'delivered', doc_no: doc.doc_no });
+    return doc;
+  });
+  res.status(201).json(result);
 });
 
 // body: { lines: [{ id, approved_qty }], review_note } — quantities may be lowered (0 = not approved)
