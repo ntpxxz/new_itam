@@ -30,6 +30,7 @@ import Issue from './pages/Issue.jsx';
 import DocumentDetail from './pages/DocumentDetail.jsx';
 import Reports from './pages/Reports.jsx';
 import Shop from './pages/Shop.jsx';
+import Cart from './pages/Cart.jsx';
 import Orders from './pages/Orders.jsx';
 import OrderDetail from './pages/OrderDetail.jsx';
 
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="issue" element={g(['asset.transact', 'consumable.move'], <Issue />)} />
         <Route path="documents/:id" element={g(['asset.view', 'consumable.view'], <DocumentDetail />)} />
         <Route path="shop" element={g('order.create', <Shop />)} />
+        <Route path="cart" element={g('order.create', <Cart />)} />
         <Route path="orders" element={g(['order.create', 'order.manage'], <Orders />)} />
         <Route path="orders/:id" element={g(['order.create', 'order.manage'], <OrderDetail />)} />
         <Route path="reports/issues" element={g('report.view', <Reports />)} />

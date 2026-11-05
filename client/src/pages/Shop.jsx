@@ -1,35 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, Package, Laptop, Plus, Minus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, ShoppingCart, Package, Laptop, Plus, Trash2 } from 'lucide-react';
 import { api } from '../api.js';
-import { useAuth } from '../auth.jsx';
 import { useDebounced } from '../hooks.js';
+import { useCart, setCart, setLineQty, maxQty } from '../cart.js';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Field, Empty, Loading, Chip } from '../components/ui.jsx';
-import RecipientFields from '../components/RecipientFields.jsx';
-import { fmtNum } from '../format.js';
+import { PageHeader, Card, Empty, Loading, Chip } from '../components/ui.jsx';
+import QtyStepper from '../components/QtyStepper.jsx';
+import { fmtNum, fmtMoney } from '../format.js';
 
-// สั่งเบิกสินค้า: pick registered, in-stock items into a cart and send the order for review.
-const CART_KEY = 'itam.cart';
-const loadCart = () => { try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch { return []; } };
-const saveCart = (c) => { try { localStorage.setItem(CART_KEY, JSON.stringify(c)); } catch { /* storage unavailable */ } };
-
+// สั่งซื้อสินค้า: pick any registered item into the cart (stock level doesn't matter); checkout happens on /cart.
 export default function Shop() {
-  const { user } = useAuth();
   const toast = useToast();
-  const navigate = useNavigate();
+  const cart = useCart();
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
   const [items, setItems] = useState(null);
-  const [cart, setCart] = useState(loadCart);
-  const [who, setWho] = useState({ person_name: user.full_name || '', department_name: '' });
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
   const term = useDebounced(q);
 
-  const load = () => api.get('/api/orders/catalog').then((d) => setItems(d.rows)).catch((e) => toast.error(e));
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => saveCart(cart), [cart]);
+  useEffect(() => {
+    api.get('/api/orders/catalog').then((d) => setItems(d.rows)).catch((e) => toast.error(e));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byKey = useMemo(() => new Map((items || []).map((x) => [x.key, x])), [items]);
   const categories = useMemo(() => [...new Set((items || []).map((x) => x.category_name))], [items]);
@@ -40,35 +31,13 @@ export default function Shop() {
   }, [items, term, cat]);
 
   const inCart = (key) => cart.find((l) => l.key === key)?.qty || 0;
-  const setQty = (item, qty, max = item.available) => setCart((c) => {
-    const n = Math.max(0, Math.min(qty, max));
-    if (!n) return c.filter((l) => l.key !== item.key);
-    return c.some((l) => l.key === item.key) ? c.map((l) => (l.key === item.key ? { ...l, qty: n } : l)) : [...c, { key: item.key, qty: n }];
-  });
-
-  const lines = cart.map((l) => ({ ...l, item: byKey.get(l.key) }));
-  const missing = items ? lines.filter((l) => !l.item || l.item.available < l.qty) : [];
-  const units = lines.reduce((s, l) => s + l.qty, 0);
-
-  const submit = async () => {
-    if (!cart.length) { toast.error('ตะกร้าว่าง — เลือกสินค้าอย่างน้อย 1 รายการ'); return; }
-    if (missing.length) { toast.error('บางรายการในตะกร้ามีไม่พอ — ปรับจำนวนหรือลบออกก่อน'); return; }
-    setBusy(true);
-    try {
-      const body = {
-        ...who, note,
-        lines: lines.map(({ qty, item: x }) => ({ kind: x.kind, consumable_id: x.consumable_id, category_id: x.category_id, name: x.name, brand: x.brand, model: x.model, qty })),
-      };
-      const o = await api.post('/api/orders', body);
-      setCart([]);
-      toast.success(`ส่งคำสั่งเบิก ${o.order_no} แล้ว — รอผู้ดูแลตรวจสอบ`);
-      navigate(`/orders/${o.id}`);
-    } catch (e) { toast.error(e); load(); setBusy(false); }
-  };
+  const units = cart.reduce((s, l) => s + l.qty, 0);
 
   return (
     <>
-      <PageHeader title="สั่งเบิกสินค้า" sub="เลือกสินค้าที่มีในสต็อกใส่ตะกร้า แล้วกดส่งคำสั่งเบิก — ผู้ดูแลจะตรวจสอบและส่งมอบให้" />
+      <PageHeader title="สั่งซื้อสินค้า" sub="เลือกสินค้าที่ลงทะเบียนไว้ใส่ตะกร้า (สั่งได้แม้สต็อกเป็น 0) แล้วไปที่ตะกร้าเพื่อส่งใบสั่งซื้อ — ผู้ดูแลจะอนุมัติ รับของ และส่งมอบให้">
+        <Link to="/cart" className="btn btn-primary"><ShoppingCart size={16} />ดูตะกร้า{cart.length ? ` (${cart.length})` : ''}</Link>
+      </PageHeader>
       <div className="two-col shop-layout">
         <Card noBody>
           <div className="toolbar">
@@ -83,8 +52,8 @@ export default function Shop() {
           </div>
           <div className="card-body">
             {!items ? <Loading /> : !shown.length ? (
-              <Empty icon={Package} title={items.length ? 'ไม่พบสินค้าที่ค้นหา' : 'ยังไม่มีสินค้าในสต็อก'}>
-                {items.length ? 'ลองคำค้นอื่น หรือเลือก “ทุกหมวดหมู่”' : 'สินค้าต้องลงทะเบียนและรับเข้าสต็อกก่อนจึงจะสั่งเบิกได้'}
+              <Empty icon={Package} title={items.length ? 'ไม่พบสินค้าที่ค้นหา' : 'ยังไม่มีสินค้าในระบบ'}>
+                {items.length ? 'ลองคำค้นอื่น หรือเลือก “ทุกหมวดหมู่”' : 'สินค้าต้องลงทะเบียนในระบบก่อนจึงจะสั่งซื้อได้'}
               </Empty>
             ) : (
               <div className="shop-grid">
@@ -98,14 +67,13 @@ export default function Shop() {
                       <div className="cell-sub">{[x.category_name, x.brand, x.model].filter(Boolean).join(' · ')}</div>
                       {x.code && <div className="tag">{x.code}</div>}
                       <div className="row-wrap" style={{ marginTop: 'auto' }}>
-                        {x.available > 0
-                          ? <Chip tone="success">เบิกได้ <span className="mono">{fmtNum(x.available)}</span> {x.unit}</Chip>
-                          : <Chip tone="neutral">หมดชั่วคราว</Chip>}
+                        <Chip tone={x.on_hand > 0 ? 'success' : 'neutral'}>คงเหลือ <span className="mono">{fmtNum(x.on_hand)}</span> {x.unit}</Chip>
+                        {x.last_price != null && <span className="cell-sub mono">{fmtMoney(x.last_price)}</span>}
                       </div>
                       {n ? (
-                        <QtyStepper value={n} max={x.available} unit={x.unit} label={x.name} onChange={(v) => setQty(x, v)} />
+                        <QtyStepper value={n} max={maxQty(x)} unit={x.unit} label={x.name} onChange={(v) => setLineQty(x.key, v, maxQty(x))} />
                       ) : (
-                        <button className="btn btn-sm" onClick={() => setQty(x, 1)} disabled={!x.available}><Plus size={14} />ใส่ตะกร้า</button>
+                        <button className="btn btn-sm" onClick={() => setLineQty(x.key, 1, maxQty(x))}><Plus size={14} />ใส่ตะกร้า</button>
                       )}
                     </div>
                   );
@@ -115,52 +83,30 @@ export default function Shop() {
           </div>
         </Card>
 
-        <div className="stack shop-cart">
+        <div className="shop-cart">
           <Card title={<span className="row" style={{ gap: 8 }}><ShoppingCart size={16} aria-hidden />ตะกร้า{cart.length ? ` (${cart.length})` : ''}</span>}
-            foot={
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={submit} disabled={busy || !cart.length}>
-                {busy ? 'กำลังส่ง…' : `ส่งคำสั่งเบิก${units ? ` · ${fmtNum(units)} หน่วย` : ''}`}
-              </button>
-            }>
+            foot={cart.length > 0 && <Link to="/cart" className="btn" style={{ width: '100%' }}>ไปที่ตะกร้า · {fmtNum(units)} หน่วย</Link>}>
             {!cart.length ? <p className="field-hint">ยังไม่มีสินค้า — กด “ใส่ตะกร้า” ที่สินค้าที่ต้องการ</p> : (
-              <div className="stack" style={{ gap: 12 }}>
-                {lines.map((l) => (
-                  <div key={l.key} className="cart-line">
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div className="cell-main">{l.item?.name || 'สินค้านี้ไม่มีในสต็อกแล้ว'}</div>
-                      {l.item && l.item.available < l.qty && <div className="cell-sub danger-text">เหลือให้เบิก {fmtNum(l.item.available)} {l.item.unit} — ลดจำนวนลง</div>}
-                      {l.item && <QtyStepper value={l.qty} max={Math.max(l.item.available, l.qty)} unit={l.item.unit} label={l.item.name} onChange={(v) => setQty(l.item, v, Math.max(l.item.available, l.qty))} />}
+              <div className="stack" style={{ gap: 10 }}>
+                {cart.map((l) => {
+                  const x = byKey.get(l.key);
+                  return (
+                    <div key={l.key} className="cart-line">
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="cell-main">{x?.name || (items ? 'สินค้านี้ไม่มีในระบบแล้ว' : '…')}</div>
+                        <div className="cell-sub"><span className="mono">{fmtNum(l.qty)}</span> {x?.unit}</div>
+                      </div>
+                      <button className="icon-btn plain" onClick={() => setCart((c) => c.filter((y) => y.key !== l.key))} aria-label={`ลบ ${x?.name || 'รายการ'} ออกจากตะกร้า`}>
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                    <button className="icon-btn plain" onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))} aria-label={`ลบ ${l.item?.name || 'รายการ'} ออกจากตะกร้า`}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
-          </Card>
-          <Card title="ผู้รับ">
-            <div className="stack" style={{ gap: 12 }}>
-              <RecipientFields value={who} onChange={setWho} required={false} compact />
-              <Field label="หมายเหตุ" hint="เช่น ใช้งานโครงการไหน หรือจุดที่ให้ส่งของ">
-                <textarea className="input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
-              </Field>
-            </div>
           </Card>
         </div>
       </div>
     </>
-  );
-}
-
-function QtyStepper({ value, max, unit, label, onChange }) {
-  return (
-    <div className="qty-stepper">
-      <button className="icon-btn" onClick={() => onChange(value - 1)} aria-label={`ลดจำนวน ${label}`}><Minus size={14} /></button>
-      <input type="number" min="0" max={max} inputMode="numeric" className="input mono" value={value} aria-label={`จำนวน ${label}`}
-        onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)} />
-      <button className="icon-btn" onClick={() => onChange(value + 1)} disabled={value >= max} aria-label={`เพิ่มจำนวน ${label}`}><Plus size={14} /></button>
-      <span className="cell-sub">{unit}</span>
-    </div>
   );
 }

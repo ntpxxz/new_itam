@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
 import { initials } from '../format.js';
+import { useCart } from '../cart.js';
 import { Menu } from './ui.jsx';
 import AssistantChat from './AssistantChat.jsx';
 
@@ -25,10 +26,10 @@ const NAV = [
     ],
   },
   {
-    label: 'สั่งเบิก',
+    label: 'สั่งซื้อ',
     items: [
-      { to: '/shop', label: 'สั่งเบิกสินค้า', icon: ShoppingCart, perm: 'order.create' },
-      { to: '/orders', label: 'คำสั่งเบิก', icon: ReceiptText, perm: ['order.create', 'order.manage'], badge: 'pendingOrders' },
+      { to: '/shop', label: 'สั่งซื้อสินค้า', icon: ShoppingCart, perm: 'order.create' },
+      { to: '/orders', label: 'ใบสั่งซื้อ', icon: ReceiptText, perm: ['order.create', 'order.manage'], badge: 'pendingOrders' },
     ],
   },
   {
@@ -62,6 +63,7 @@ export default function Layout() {
   const [open, setOpen] = useState(false);
   const [badges, setBadges] = useState({ overdue: 0, lowStock: 0, pendingReceive: 0, pendingOrders: 0 });
   const [q, setQ] = useState('');
+  const cart = useCart();
   const searchRef = useRef(null);
   const loc = useLocation();
   const navigate = useNavigate();
@@ -114,7 +116,7 @@ export default function Layout() {
                     <span>{i.label}</span>
                     {i.badge && badges[i.badge] > 0 && (
                       <span className={`nav-badge${i.badge === 'lowStock' ? ' warn' : ''}`}
-                        aria-label={{ overdue: `เกินกำหนดคืน ${badges.overdue} รายการ`, lowStock: `สต็อกต่ำ ${badges.lowStock} รายการ`, pendingReceive: `รอรับเข้า ${badges.pendingReceive} รายการ`, pendingOrders: `คำสั่งเบิกรอดำเนินการ ${badges.pendingOrders} รายการ` }[i.badge]}>
+                        aria-label={{ overdue: `เกินกำหนดคืน ${badges.overdue} รายการ`, lowStock: `สต็อกต่ำ ${badges.lowStock} รายการ`, pendingReceive: `รอรับเข้า ${badges.pendingReceive} รายการ`, pendingOrders: `ใบสั่งซื้อรอดำเนินการ ${badges.pendingOrders} รายการ` }[i.badge]}>
                         {badges[i.badge]}
                       </span>
                     )}
@@ -149,6 +151,11 @@ export default function Layout() {
               <span className="kbd" aria-hidden>{isMac ? '⌘K' : 'Ctrl K'}</span>
             </form>
           ) : <div className="spacer" />}
+          {can('order.create') && (
+            <Link to="/cart" className="icon-btn" aria-label={cart.length ? `ตะกร้า ${cart.length} รายการ` : 'ตะกร้า'} title="ตะกร้า">
+              <ShoppingCart size={18} />{cart.length > 0 && <span className="count mono" aria-hidden>{cart.length}</span>}
+            </Link>
+          )}
           {can('asset.view') && (
             <Link to="/scan" className="icon-btn" aria-label="สแกน QR" title="สแกน QR"><ScanLine size={18} /></Link>
           )}

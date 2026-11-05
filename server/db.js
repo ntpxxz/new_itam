@@ -168,6 +168,10 @@ if (MSSQL) {
     `UPDATE stock_movements SET received_date = date(created_at) WHERE type = 'in'`);
   addColumn('consumables', 'image_path', 'TEXT');
   addColumn('pending_receipts', 'deleted_at', 'TEXT');
+  addColumn('orders', 'received_by', 'INTEGER REFERENCES users(id)');
+  addColumn('orders', 'received_at', 'TEXT');
+  addColumn('orders', 'receive_doc_id', 'INTEGER REFERENCES documents(id)');
+  addColumn('order_lines', 'unit_price', 'REAL');
   // Indexes on migrated columns go here, after the column is guaranteed to exist.
   db.exec(`CREATE INDEX IF NOT EXISTS idx_atx_doc ON asset_transactions(doc_id) WHERE doc_id IS NOT NULL;
            CREATE INDEX IF NOT EXISTS idx_sm_doc ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;`);

@@ -121,6 +121,7 @@ img { max-width: 100%; display: block; }
 }
 .icon-btn:hover { background: var(--bg-subtle); color: var(--text); }
 .icon-btn.plain { border-color: transparent; background: transparent; }
+.icon-btn .count { position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--brand); color: var(--text-on-brand); font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; border: 2px solid var(--bg-surface); box-sizing: content-box; }
 .icon-btn .dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); border: 2px solid var(--bg-surface); }
 
 /* ---------- Inputs ---------- */

@@ -106,11 +106,12 @@ available ──transfer──▶ available (location/department move)
 - Every non-empty row is kept. Each line's `state` is computed when listed: `ready` (SKU matches a consumable) · `new` (SKU not in the system → "สร้างรายการใหม่" dialog on the page creates the consumable with stock 0, or the full form `/assets/new?sku=&name=&unit_cost=`) · `incomplete` (no SKU, SKU with spaces, no qty, or an existing per-unit asset; `problem` says why). SKU/qty/price are edited in the row; only `ready` lines can be received.
 - Anyone with `consumable.move` can come back later, tick ready lines and receive them: one RCV slip via `createReceiveDoc()` (shared with `/receive`), then the lines become `received` with `doc_id`, in the same transaction. Lines can be edited (SKU/qty/price) or `cancelled` while pending; ลบ soft-deletes pending/cancelled lines (`deleted_at`, hidden from every tab, audited) — received lines can't be deleted. Sidebar badge `pendingReceive`.
 
-### คำสั่งเบิก (orders / cart) — `server/routes/orders.js` (`/api/orders`), pages `/shop`, `/orders`, `/orders/:id`
-- Self-service: a user with `order.create` (role **ผู้ขอเบิก** has only this) picks **registered, in-stock** items into a cart (`/shop`, cart kept in localStorage) and sends an order `ORD-YYYYMM-0001` (status `pending`). Items not in the system can't be ordered.
-- Catalog (`GET /api/orders/catalog`) = consumables + available per-unit assets grouped by category/name/brand/model. `available` = on hand − quantities of `approved` (not yet delivered) orders, so approved orders reserve stock. Order lines store that group, not asset ids; actual units (oldest `received_date` first) are picked at delivery.
-- `order.manage`: approve (may lower each line's quantity, 0 = not approved; rechecks stock) → `approved` = รอส่งมอบ; reject (reason required). Deliver → one ISS slip (เบิกถาวร) via `createIssueDoc()` from `documents.js` in the same transaction, then `delivered` + `doc_id`. Requester may cancel while `pending`; managers also while `approved`. Every step is audited.
-- Users without `order.manage` see only their own orders. Sidebar badge `pendingOrders` (managers: pending + approved; requesters: own approved).
+### ใบสั่งซื้อ (purchase orders / cart) — `server/routes/orders.js` (`/api/orders`), pages `/shop`, `/cart`, `/orders`, `/orders/:id`
+- A **purchase order**, not a requisition: a user with `order.create` (role **ผู้สั่งซื้อ**, key `requester`, has only this) picks any **registered** item into a cart on `/shop` — **stock level never limits it** (0 is fine; per line ≤ 9999, assets ≤ 200). Reviews it on `/cart` (recipient, note, estimate from last price; topbar cart icon shows the count; cart = `client/src/cart.js`, localStorage) and sends `ORD-YYYYMM-0001` (`pending`). Unregistered items can't be ordered.
+- Catalog (`GET /api/orders/catalog`) = all consumables + per-unit assets grouped by category/name/brand/model (non-scrapped), with `on_hand` (info only) and `last_price`. Lines store that group plus `unit_price`.
+- Flow (`order.manage`): approve (may lower quantities, 0 = not approved) or reject (reason required) → **รับของ** `POST /:id/receive`: one RCV slip via `createReceiveDoc()` (prices per line, vendor, location, PO no. defaults to the order no.; consumables stock in, assets created per unit) → **ส่งมอบ** `POST /:id/deliver`: one ISS slip via `createIssueDoc()` using exactly the asset units that RCV created. Each step is one transaction and audited. Receiving/delivering also needs `asset.create`/`consumable.move` and `asset.transact` (the slip rules apply).
+- Stage = `status`, except `approved` + `receive_doc_id` is shown as `received` (รับของแล้ว · รอส่งมอบ) — no extra status value, so the CHECK constraint didn't change. Cancel: requester while `pending`, managers also while `approved`; never after receiving.
+- Users without `order.manage` see only their own orders. Sidebar badge `pendingOrders` (managers: pending + approved incl. received; requesters: own received, awaiting pickup).
 - `db.js` turns `''` params into NULL, so `brand`/`model` (NOT NULL DEFAULT '') are written and matched with `COALESCE(?, '')`.
 
 ### Recipients: free text name + แผนก — `server/recipient.js`
@@ -149,7 +150,7 @@ available ──transfer──▶ available (location/department move)
 ### Permissions
 - Permission keys are fine-grained (`asset.view`, `asset.create`, `asset.transact`, `asset.scrap`, `user.manage`, …). Roles are just bundles editable in UI (`/admin/roles`).
 - Server: `requirePerm('asset.edit')` on every mutating route. Client: `can('asset.edit')` only hides UI.
-- Seeded roles: **Admin** (all), **IT Staff** (all except user/role/settings), **Viewer** (read-only), **ผู้ขอเบิก** (`order.create` only — lands on `/shop`).
+- Seeded roles: **Admin** (all), **IT Staff** (all except user/role/settings), **Viewer** (read-only), **ผู้สั่งซื้อ** (`order.create` only — lands on `/shop`).
 - Menus with their own permission: ยืม-คืน `loan.view`, ประวัติรายการ `history.view`, สแกน QR `scan.use`, พิมพ์สติ๊กเกอร์ `label.print`, พนักงาน `people.view` / `people.manage` (writes to `/api/master/people`; other master tables stay `master.manage`). Their data still comes from asset APIs, so they also need `asset.view`.
 - A permission split out of an older one is listed in `SPLIT_FROM` (`server/permissions.js`); `bootstrap()` grants it to every role holding the older key, so upgrades don't remove access.
 
@@ -203,7 +204,7 @@ available ──transfer──▶ available (location/department move)
 ### Phase 3
 - [x] Stock count sessions: scan per location → summary of found / missing / unexpected
 - [x] Chat assistant (rule-based): type a receive/issue/borrow request → reviewed draft slip → บันทึก
-- [x] คำสั่งเบิก: end-user cart → admin approve/reject → deliver as ISS slip (issue only)
+- [x] ใบสั่งซื้อ: end-user cart (any stock level) → admin approve/reject → รับของ (RCV) → ส่งมอบ (ISS)
 - [ ] Self-service borrow requests (due date) through the same approval flow
 - [ ] Email/LINE notifications for overdue & warranty
 - [ ] 2FA, AD/SSO

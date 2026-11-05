@@ -70,10 +70,10 @@ r.get('/badges', requireAuth, async (req, res) => {
     overdue: can(req.user, 'asset.view') ? (await get(`SELECT COUNT(*) n FROM assets WHERE deleted_at IS NULL AND status='borrowed' AND due_date < ?`, today())).n : 0,
     lowStock: can(req.user, 'consumable.view') ? (await get('SELECT COUNT(*) n FROM consumables WHERE deleted_at IS NULL AND qty_on_hand <= reorder_point')).n : 0,
     pendingReceive: can(req.user, 'consumable.view') ? (await get(`SELECT COUNT(*) n FROM pending_receipts WHERE status = 'pending' AND deleted_at IS NULL`)).n : 0,
-    // Admins: orders to review or hand over. Requesters: their own approved orders waiting for pickup.
+    // Admins: purchase orders to review, receive or hand over. Requesters: their own goods that arrived and await pickup.
     pendingOrders: can(req.user, 'order.manage')
       ? (await get(`SELECT COUNT(*) n FROM orders WHERE status IN ('pending', 'approved')`)).n
-      : can(req.user, 'order.create') ? (await get(`SELECT COUNT(*) n FROM orders WHERE status = 'approved' AND requested_by = ?`, req.user.id)).n : 0,
+      : can(req.user, 'order.create') ? (await get(`SELECT COUNT(*) n FROM orders WHERE status = 'approved' AND receive_doc_id IS NOT NULL AND requested_by = ?`, req.user.id)).n : 0,
   });
 });
 

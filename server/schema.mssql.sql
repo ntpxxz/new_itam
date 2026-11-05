@@ -269,6 +269,9 @@ CREATE TABLE orders (
   reviewed_by   INT NULL REFERENCES users(id),
   reviewed_at   DATETIME2(0) NULL,
   review_note   NVARCHAR(MAX) NULL,
+  received_by   INT NULL REFERENCES users(id),
+  received_at   DATETIME2(0) NULL,
+  receive_doc_id INT NULL REFERENCES documents(id),
   delivered_by  INT NULL REFERENCES users(id),
   delivered_at  DATETIME2(0) NULL,
   doc_id        INT NULL REFERENCES documents(id),
@@ -286,7 +289,8 @@ CREATE TABLE order_lines (
   brand         NVARCHAR(200) NOT NULL DEFAULT '',
   model         NVARCHAR(200) NOT NULL DEFAULT '',
   qty           INT NOT NULL CHECK (qty > 0),
-  approved_qty  INT NULL CHECK (approved_qty >= 0)
+  approved_qty  INT NULL CHECK (approved_qty >= 0),
+  unit_price    DECIMAL(14,2) NULL
 );
 
 IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NULL
@@ -339,6 +343,10 @@ END
 GO
 
 IF COL_LENGTH(N'dbo.pending_receipts', N'deleted_at') IS NULL ALTER TABLE pending_receipts ADD deleted_at DATETIME2(0) NULL;
+IF COL_LENGTH(N'dbo.orders', N'received_by') IS NULL ALTER TABLE orders ADD received_by INT NULL REFERENCES users(id);
+IF COL_LENGTH(N'dbo.orders', N'received_at') IS NULL ALTER TABLE orders ADD received_at DATETIME2(0) NULL;
+IF COL_LENGTH(N'dbo.orders', N'receive_doc_id') IS NULL ALTER TABLE orders ADD receive_doc_id INT NULL REFERENCES documents(id);
+IF COL_LENGTH(N'dbo.order_lines', N'unit_price') IS NULL ALTER TABLE order_lines ADD unit_price DECIMAL(14,2) NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_pending_status') CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);

@@ -245,10 +245,10 @@ CREATE TABLE IF NOT EXISTS pending_receipts (
 );
 CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_receipts(status, batch_id);
 
--- คำสั่งเบิก: a user picks in-stock items into a cart and orders them (pending). An admin reviews the
--- quantities and approves (approved = awaiting delivery) or rejects; delivering creates a normal ISS slip (doc_id).
--- A line is a consumable (consumable_id) or a group of per-unit assets with the same category/name/brand/model;
--- the actual asset units are picked at delivery.
+-- ใบสั่งซื้อ: a user picks registered items (any stock level) into a cart and orders them (pending). An admin
+-- approves (may lower quantities) or rejects. Goods arriving → RCV slip (receive_doc_id, stock in; stage "received"
+-- while status stays 'approved'), then handing over → ISS slip (doc_id) and status 'delivered'.
+-- A line is a consumable (consumable_id) or a group of per-unit assets with the same category/name/brand/model.
 CREATE TABLE IF NOT EXISTS orders (
   id            INTEGER PRIMARY KEY,
   order_no      TEXT UNIQUE NOT NULL,
@@ -261,6 +261,9 @@ CREATE TABLE IF NOT EXISTS orders (
   reviewed_by   INTEGER REFERENCES users(id),
   reviewed_at   TEXT,
   review_note   TEXT,
+  received_by   INTEGER REFERENCES users(id),
+  received_at   TEXT,
+  receive_doc_id INTEGER REFERENCES documents(id),
   delivered_by  INTEGER REFERENCES users(id),
   delivered_at  TEXT,
   doc_id        INTEGER REFERENCES documents(id),
@@ -279,7 +282,8 @@ CREATE TABLE IF NOT EXISTS order_lines (
   brand         TEXT NOT NULL DEFAULT '',
   model         TEXT NOT NULL DEFAULT '',
   qty           INTEGER NOT NULL CHECK (qty > 0),
-  approved_qty  INTEGER CHECK (approved_qty >= 0)
+  approved_qty  INTEGER CHECK (approved_qty >= 0),
+  unit_price    REAL
 );
 CREATE INDEX IF NOT EXISTS idx_order_lines ON order_lines(order_id);
 

@@ -149,7 +149,8 @@ CREATE TABLE order_lines (
   brand         TEXT NOT NULL DEFAULT '',
   model         TEXT NOT NULL DEFAULT '',
   qty           INTEGER NOT NULL CHECK (qty > 0),
-  approved_qty  INTEGER CHECK (approved_qty >= 0)
+  approved_qty  INTEGER CHECK (approved_qty >= 0),
+  unit_price    REAL
 );
 
 CREATE TABLE orders (
@@ -164,6 +165,9 @@ CREATE TABLE orders (
   reviewed_by   INTEGER REFERENCES users(id),
   reviewed_at   TEXT,
   review_note   TEXT,
+  received_by   INTEGER REFERENCES users(id),
+  received_at   TEXT,
+  receive_doc_id INTEGER REFERENCES documents(id),
   delivered_by  INTEGER REFERENCES users(id),
   delivered_at  TEXT,
   doc_id        INTEGER REFERENCES documents(id),
@@ -330,8 +334,8 @@ INSERT INTO permissions (key, name, grp) VALUES ('consumable.view', 'ดูว�
 INSERT INTO permissions (key, name, grp) VALUES ('consumable.manage', 'เพิ่ม / แก้ไขวัสดุสิ้นเปลือง', 'วัสดุสิ้นเปลือง');
 INSERT INTO permissions (key, name, grp) VALUES ('consumable.move', 'รับเข้า / เบิก / ปรับยอด', 'วัสดุสิ้นเปลือง');
 INSERT INTO permissions (key, name, grp) VALUES ('stockcount.manage', 'ตรวจนับ', 'วัสดุสิ้นเปลือง');
-INSERT INTO permissions (key, name, grp) VALUES ('order.create', 'สั่งเบิกสินค้า (ตะกร้า)', 'สั่งเบิก');
-INSERT INTO permissions (key, name, grp) VALUES ('order.manage', 'ตรวจสอบ / อนุมัติ / ส่งมอบคำสั่งเบิก', 'สั่งเบิก');
+INSERT INTO permissions (key, name, grp) VALUES ('order.create', 'สั่งซื้อสินค้า (ตะกร้า)', 'สั่งซื้อ');
+INSERT INTO permissions (key, name, grp) VALUES ('order.manage', 'อนุมัติ / รับของ / ส่งมอบใบสั่งซื้อ', 'สั่งซื้อ');
 INSERT INTO permissions (key, name, grp) VALUES ('scan.use', 'สแกน QR', 'เครื่องมือ');
 INSERT INTO permissions (key, name, grp) VALUES ('label.print', 'พิมพ์สติ๊กเกอร์ QR', 'เครื่องมือ');
 INSERT INTO permissions (key, name, grp) VALUES ('people.view', 'ดูรายชื่อพนักงาน', 'พนักงาน');
@@ -348,7 +352,7 @@ INSERT INTO permissions (key, name, grp) VALUES ('settings.manage', 'ตั้�
 INSERT INTO roles (id, key, name, description, is_system) VALUES (1, 'admin', 'Admin', 'ทำได้ทุกอย่าง', 1);
 INSERT INTO roles (id, key, name, description, is_system) VALUES (2, 'it_staff', 'IT Staff', 'จัดการอุปกรณ์และวัสดุสิ้นเปลือง', 1);
 INSERT INTO roles (id, key, name, description, is_system) VALUES (3, 'viewer', 'Viewer', 'ดูข้อมูลอย่างเดียว', 1);
-INSERT INTO roles (id, key, name, description, is_system) VALUES (4, 'requester', 'ผู้ขอเบิก', 'สั่งเบิกสินค้าจากสต็อกผ่านตะกร้า', 1);
+INSERT INTO roles (id, key, name, description, is_system) VALUES (4, 'requester', 'ผู้สั่งซื้อ', 'สั่งซื้อสินค้าผ่านตะกร้า', 1);
 
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'dashboard.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'asset.view');
