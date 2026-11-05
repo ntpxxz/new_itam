@@ -203,11 +203,29 @@ available ──transfer──▶ available (location/department move)
 - [x] In-app scanner page (camera when on HTTPS/localhost, manual tag entry fallback)
 - [x] Excel export (assets, consumables, history) + import assets from template
 
-### Phase 3
+### Phase 3 ✅ (this build)
 - [x] Stock count sessions: scan per location → summary of found / missing / unexpected
-- [x] Chat assistant (rule-based): type a receive/issue/borrow request → reviewed draft slip → บันทึก
+- [x] Chat assistant (rule-based, offline): type a receive/issue/borrow request → reviewed draft slip → บันทึก
+- [x] รายการรอรับเข้า: CSV upload → pending lines → receive later as one RCV slip
 - [x] ใบสั่งซื้อ: end-user cart (any stock level) → admin approve/reject → approved lines go to รอรับเข้า → RCV slip
-- [ ] Self-service borrow requests (due date) through the same approval flow
-- [ ] Email/LINE notifications for overdue & warranty
-- [ ] 2FA, AD/SSO
-- [ ] Maintenance cost tracking per repair, depreciation
+- [x] Consumable SKU = barcode · item photos · opening stock import (`import-stock`)
+- [x] SQL Server driver + `migrate:mssql` · Docker deployment
+
+### Before merging to main (verification debt)
+- [ ] Click through `/shop` → `/cart` → `/orders/:id` (approve / reject / cancel) → `/pending-receive` → RCV in a browser, desktop + 460px phone width
+- [ ] Run order approve + receive on SQL Server (a scratch database, never the live one), incl. an older DB with `delivered` orders
+- [ ] Regenerate `docs/create-empty-db.mssql.sql` (out of date)
+
+### Phase 4 — next, in priority order
+Prefer free / offline options (no paid APIs, intranet only).
+1. [ ] **Hand over a received order** — button on `/orders/:id` once all lines are received: opens `/issue` pre-filled with the order's recipient + lines (a normal ISS slip, linked back to the order). Today this is a manual เบิกออก.
+2. [ ] **Requester notifications in-app** — bell in the topbar: order approved / rejected / received. Stored in a `notifications` table; no external service.
+3. [ ] **Self-service borrow requests** — same cart + approval flow with mode `borrow` and a due date; approval runs `applyAction('borrow')` via `createIssueDoc`.
+4. [ ] **Overdue & warranty reminders** — daily job (like the PDPA purge) → in-app list first; optional email through the organisation's own SMTP. (LINE Notify was shut down in 2025; LINE would need the Messaging API.)
+5. [ ] **Repair cost per job** — cost, vendor, invoice on `repair_in`; total per asset on the detail page and in reports.
+6. [ ] **Depreciation** — straight-line by category life (years) → book value on the asset page + Excel export.
+7. [ ] **Automated tests** — turn the scratch e2e scripts (orders, pending receipts, slips) into `npm test` against a temp SQLite DB.
+
+### Later
+- [ ] 2FA (TOTP, offline authenticator apps)
+- [ ] AD / LDAP login (only if the organisation provides it)
