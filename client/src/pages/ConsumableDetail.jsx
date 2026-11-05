@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { PackageMinus, PackagePlus, SlidersHorizontal, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { PackageMinus, PackagePlus, SlidersHorizontal, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react';
 import { useApi } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
 import { useToast } from '../components/Toast.jsx';
 import { PageHeader, Card, Loading, Empty, Menu, Confirm } from '../components/ui.jsx';
 import { MoveDialog } from '../components/ConsumableDialogs.jsx';
+import ItemPhoto from '../components/ItemPhoto.jsx';
 import { STOCK_META, ActionIcon } from '../components/actions.jsx';
 import { fmtNum, fmtMoney, fmtDateTime, fmtDate, fmtMonth, who } from '../format.js';
 
@@ -96,6 +97,10 @@ export default function ConsumableDetail() {
             )}
           </Card>
           <Card title="ข้อมูล">
+            <div style={{ marginBottom: 16 }}>
+              <ItemPhoto src={x.image_path} alt={x.name} icon={Package} uploadUrl={`/api/consumables/${x.id}/image`}
+                canEdit={can('consumable.manage')} onDone={reload} style={{ width: '100%', height: 180 }} />
+            </div>
             <dl className="dl">
               <dt>SKU</dt><dd className="mono">{x.sku}</dd>
               <dt>หมวดหมู่</dt><dd>{x.category_name}</dd>

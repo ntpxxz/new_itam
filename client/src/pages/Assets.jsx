@@ -232,7 +232,7 @@ function StockRow({ r, can, onOpen, onMove, onDelete }) {
       <td />
       <td>
         <div className="row" style={{ gap: 10 }}>
-          <span className="thumb"><Package size={16} /></span>
+          <span className="thumb">{r.image_path ? <img src={r.image_path} alt="" loading="lazy" /> : <Package size={16} />}</span>
           <div style={{ minWidth: 0 }}>
             <Link to={`/consumables/${r.id}`} className="cell-main" onClick={(e) => e.stopPropagation()}>{r.name}</Link>
             <div className="tag">{r.code}</div>

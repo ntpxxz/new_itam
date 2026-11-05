@@ -142,6 +142,7 @@ Triggers: `audit_no_delete`, `audit_no_update`
 | `unit_cost` | REAL | yes |  |  |
 | `vendor_id` | INTEGER | yes |  | FK → vendors.id |
 | `notes` | TEXT | yes |  |  |
+| `image_path` | TEXT | yes |  |  |
 | `created_at` | TEXT | NO | `datetime('now')` |  |
 | `updated_at` | TEXT | NO | `datetime('now')` |  |
 | `deleted_at` | TEXT | yes |  |  |

@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { useToast } from '../components/Toast.jsx';
 import { PageHeader, Card, StatusChip, Loading, Empty, Confirm, Menu } from '../components/ui.jsx';
 import ActionDialog from '../components/ActionDialog.jsx';
+import ItemPhoto from '../components/ItemPhoto.jsx';
 import { ACTION_META } from '../components/actions.jsx';
 import { fmtDate, fmtDateTime, fmtMoney, daysFromToday, initials, fmtISODate, who, isHeld } from '../format.js';
 
@@ -73,7 +74,8 @@ export default function AssetDetail() {
         <div className="stack">
           <Card>
             <div className="asset-hero">
-              <div className="asset-photo">{a.image_path ? <img src={a.image_path} alt={a.name} /> : <Laptop size={32} aria-hidden />}</div>
+              <ItemPhoto src={a.image_path} alt={a.name} icon={Laptop} uploadUrl={`/api/assets/${a.id}/image`}
+                canEdit={can('asset.edit') && a.status !== 'scrapped'} onDone={reload} />
               <div className="stack" style={{ gap: 8, minWidth: 0 }}>
                 <div className="row-wrap">
                   <StatusChip status={a.status} />

@@ -106,11 +106,12 @@ export default function AssetForm() {
         saved = isEdit ? await api.put(`/api/consumables/${id}`, form) : await api.post('/api/consumables', form);
       } else {
         saved = isEdit ? await api.put(`/api/assets/${id}`, form) : await api.post('/api/assets', form);
-        if (image) {
-          const fd = new FormData();
-          fd.append('image', image);
-          await api.post(`/api/assets/${saved.id}/image`, fd).catch((err) => toast.error(`บันทึกข้อมูลแล้ว แต่อัปโหลดรูปไม่สำเร็จ: ${err.message}`));
-        }
+      }
+      if (image) {
+        const fd = new FormData();
+        fd.append('image', image);
+        await api.post(`/api${base}/${saved.id}/image`, fd)
+          .catch((err) => toast.error(`บันทึกข้อมูลแล้ว แต่อัปโหลดรูปไม่สำเร็จ: ${err.message}`));
       }
       toast.success(isEdit ? 'บันทึกการแก้ไขแล้ว' : `เพิ่ม ${saved.asset_tag || saved.sku} แล้ว`);
       navigate(`${base}/${saved.id}`, { replace: true });
@@ -227,7 +228,7 @@ export default function AssetForm() {
         </div>
 
         <div className="stack">
-          {kind === 'asset' && (
+          {kind && (
             <Card title="รูปภาพ">
               <label className="stack" style={{ gap: 10, alignItems: 'center', cursor: 'pointer' }}>
                 <div className="asset-photo" style={{ width: '100%', height: 180 }}>
