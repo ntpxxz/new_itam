@@ -245,6 +245,44 @@ CREATE TABLE IF NOT EXISTS pending_receipts (
 );
 CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_receipts(status, batch_id);
 
+-- คำสั่งเบิก: a user picks in-stock items into a cart and orders them (pending). An admin reviews the
+-- quantities and approves (approved = awaiting delivery) or rejects; delivering creates a normal ISS slip (doc_id).
+-- A line is a consumable (consumable_id) or a group of per-unit assets with the same category/name/brand/model;
+-- the actual asset units are picked at delivery.
+CREATE TABLE IF NOT EXISTS orders (
+  id            INTEGER PRIMARY KEY,
+  order_no      TEXT UNIQUE NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','delivered','rejected','cancelled')),
+  person_id     INTEGER REFERENCES people(id),
+  department_id INTEGER REFERENCES departments(id),
+  note          TEXT,
+  requested_by  INTEGER NOT NULL REFERENCES users(id),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  reviewed_by   INTEGER REFERENCES users(id),
+  reviewed_at   TEXT,
+  review_note   TEXT,
+  delivered_by  INTEGER REFERENCES users(id),
+  delivered_at  TEXT,
+  doc_id        INTEGER REFERENCES documents(id),
+  cancelled_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, id);
+CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(requested_by, id);
+
+CREATE TABLE IF NOT EXISTS order_lines (
+  id            INTEGER PRIMARY KEY,
+  order_id      INTEGER NOT NULL REFERENCES orders(id),
+  kind          TEXT NOT NULL CHECK (kind IN ('asset','consumable')),
+  consumable_id INTEGER REFERENCES consumables(id),
+  category_id   INTEGER REFERENCES categories(id),
+  name          TEXT NOT NULL,
+  brand         TEXT NOT NULL DEFAULT '',
+  model         TEXT NOT NULL DEFAULT '',
+  qty           INTEGER NOT NULL CHECK (qty > 0),
+  approved_qty  INTEGER CHECK (approved_qty >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_order_lines ON order_lines(order_id);
+
 CREATE TABLE IF NOT EXISTS access_logs (
   id         INTEGER PRIMARY KEY,
   user_id    INTEGER,

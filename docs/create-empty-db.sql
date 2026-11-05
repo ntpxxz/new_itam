@@ -139,6 +139,37 @@ CREATE TABLE locations (
   deleted_at TEXT
 );
 
+CREATE TABLE order_lines (
+  id            INTEGER PRIMARY KEY,
+  order_id      INTEGER NOT NULL REFERENCES orders(id),
+  kind          TEXT NOT NULL CHECK (kind IN ('asset','consumable')),
+  consumable_id INTEGER REFERENCES consumables(id),
+  category_id   INTEGER REFERENCES categories(id),
+  name          TEXT NOT NULL,
+  brand         TEXT NOT NULL DEFAULT '',
+  model         TEXT NOT NULL DEFAULT '',
+  qty           INTEGER NOT NULL CHECK (qty > 0),
+  approved_qty  INTEGER CHECK (approved_qty >= 0)
+);
+
+CREATE TABLE orders (
+  id            INTEGER PRIMARY KEY,
+  order_no      TEXT UNIQUE NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','delivered','rejected','cancelled')),
+  person_id     INTEGER REFERENCES people(id),
+  department_id INTEGER REFERENCES departments(id),
+  note          TEXT,
+  requested_by  INTEGER NOT NULL REFERENCES users(id),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  reviewed_by   INTEGER REFERENCES users(id),
+  reviewed_at   TEXT,
+  review_note   TEXT,
+  delivered_by  INTEGER REFERENCES users(id),
+  delivered_at  TEXT,
+  doc_id        INTEGER REFERENCES documents(id),
+  cancelled_at  TEXT
+);
+
 CREATE TABLE pending_batches (
   id          INTEGER PRIMARY KEY,
   file_name   TEXT,
@@ -277,6 +308,9 @@ CREATE INDEX idx_atx_doc ON asset_transactions(doc_id) WHERE doc_id IS NOT NULL;
 CREATE INDEX idx_audit_created ON audit_logs(created_at);
 CREATE INDEX idx_audit_entity ON audit_logs(entity, entity_id);
 CREATE INDEX idx_docs_type ON documents(type, doc_date);
+CREATE INDEX idx_order_lines ON order_lines(order_id);
+CREATE INDEX idx_orders_status ON orders(status, id);
+CREATE INDEX idx_orders_user ON orders(requested_by, id);
 CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);
 CREATE INDEX idx_sm_cons ON stock_movements(consumable_id, created_at);
 CREATE INDEX idx_sm_doc ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;
@@ -290,11 +324,19 @@ INSERT INTO permissions (key, name, grp) VALUES ('asset.edit', 'แก้ไข�
 INSERT INTO permissions (key, name, grp) VALUES ('asset.delete', 'ลบอุปกรณ์ (soft delete)', 'อุปกรณ์');
 INSERT INTO permissions (key, name, grp) VALUES ('asset.transact', 'ยืม / คืน / เบิก / โอน / ส่งซ่อม', 'อุปกรณ์');
 INSERT INTO permissions (key, name, grp) VALUES ('asset.scrap', 'รอจำหน่าย / Scrap', 'อุปกรณ์');
+INSERT INTO permissions (key, name, grp) VALUES ('loan.view', 'ดูหน้ายืม-คืน', 'อุปกรณ์');
+INSERT INTO permissions (key, name, grp) VALUES ('history.view', 'ดูประวัติรายการ', 'อุปกรณ์');
 INSERT INTO permissions (key, name, grp) VALUES ('consumable.view', 'ดูวัสดุสิ้นเปลือง', 'วัสดุสิ้นเปลือง');
 INSERT INTO permissions (key, name, grp) VALUES ('consumable.manage', 'เพิ่ม / แก้ไขวัสดุสิ้นเปลือง', 'วัสดุสิ้นเปลือง');
 INSERT INTO permissions (key, name, grp) VALUES ('consumable.move', 'รับเข้า / เบิก / ปรับยอด', 'วัสดุสิ้นเปลือง');
 INSERT INTO permissions (key, name, grp) VALUES ('stockcount.manage', 'ตรวจนับ', 'วัสดุสิ้นเปลือง');
-INSERT INTO permissions (key, name, grp) VALUES ('master.manage', 'ข้อมูลหลัก (หมวด, สถานที่, แผนก, ผู้ขาย, พนักงาน)', 'ตั้งค่า');
+INSERT INTO permissions (key, name, grp) VALUES ('order.create', 'สั่งเบิกสินค้า (ตะกร้า)', 'สั่งเบิก');
+INSERT INTO permissions (key, name, grp) VALUES ('order.manage', 'ตรวจสอบ / อนุมัติ / ส่งมอบคำสั่งเบิก', 'สั่งเบิก');
+INSERT INTO permissions (key, name, grp) VALUES ('scan.use', 'สแกน QR', 'เครื่องมือ');
+INSERT INTO permissions (key, name, grp) VALUES ('label.print', 'พิมพ์สติ๊กเกอร์ QR', 'เครื่องมือ');
+INSERT INTO permissions (key, name, grp) VALUES ('people.view', 'ดูรายชื่อพนักงาน', 'พนักงาน');
+INSERT INTO permissions (key, name, grp) VALUES ('people.manage', 'เพิ่ม / แก้ไข / ลบพนักงาน', 'พนักงาน');
+INSERT INTO permissions (key, name, grp) VALUES ('master.manage', 'ข้อมูลหลัก (หมวด, สถานที่, แผนก, ผู้ขาย)', 'ตั้งค่า');
 INSERT INTO permissions (key, name, grp) VALUES ('data.import', 'นำเข้า Excel', 'ตั้งค่า');
 INSERT INTO permissions (key, name, grp) VALUES ('report.view', 'ดูรายงาน', 'ทั่วไป');
 INSERT INTO permissions (key, name, grp) VALUES ('report.export', 'ส่งออก Excel', 'ตั้งค่า');
@@ -306,6 +348,7 @@ INSERT INTO permissions (key, name, grp) VALUES ('settings.manage', 'ตั้�
 INSERT INTO roles (id, key, name, description, is_system) VALUES (1, 'admin', 'Admin', 'ทำได้ทุกอย่าง', 1);
 INSERT INTO roles (id, key, name, description, is_system) VALUES (2, 'it_staff', 'IT Staff', 'จัดการอุปกรณ์และวัสดุสิ้นเปลือง', 1);
 INSERT INTO roles (id, key, name, description, is_system) VALUES (3, 'viewer', 'Viewer', 'ดูข้อมูลอย่างเดียว', 1);
+INSERT INTO roles (id, key, name, description, is_system) VALUES (4, 'requester', 'ผู้ขอเบิก', 'สั่งเบิกสินค้าจากสต็อกผ่านตะกร้า', 1);
 
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'dashboard.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'asset.view');
@@ -314,10 +357,18 @@ INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'asset.edit');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'asset.delete');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'asset.transact');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'asset.scrap');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'loan.view');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'history.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'consumable.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'consumable.manage');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'consumable.move');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'stockcount.manage');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'order.create');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'order.manage');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'scan.use');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'label.print');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'people.view');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'people.manage');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'master.manage');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'data.import');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (1, 'report.view');
@@ -333,10 +384,18 @@ INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'asset.edit');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'asset.delete');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'asset.transact');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'asset.scrap');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'loan.view');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'history.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'consumable.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'consumable.manage');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'consumable.move');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'stockcount.manage');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'order.create');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'order.manage');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'scan.use');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'label.print');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'people.view');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'people.manage');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'master.manage');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'data.import');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (2, 'report.view');
@@ -346,6 +405,12 @@ INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'dashboard.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'report.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'asset.view');
 INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'consumable.view');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'loan.view');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'history.view');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'scan.use');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'label.print');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (3, 'people.view');
+INSERT INTO role_permissions (role_id, perm_key) VALUES (4, 'order.create');
 
 INSERT INTO settings (key, value) VALUES ('max_failed_logins', '5');
 INSERT INTO settings (key, value) VALUES ('lockout_minutes', '15');

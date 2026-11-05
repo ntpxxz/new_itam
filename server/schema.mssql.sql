@@ -256,6 +256,39 @@ CREATE TABLE pending_receipts (
   deleted_at DATETIME2(0) NULL
 );
 
+IF OBJECT_ID(N'dbo.orders', N'U') IS NULL
+CREATE TABLE orders (
+  id            INT IDENTITY(1,1) PRIMARY KEY,
+  order_no      NVARCHAR(30) NOT NULL UNIQUE,
+  status        NVARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','delivered','rejected','cancelled')),
+  person_id     INT NULL REFERENCES people(id),
+  department_id INT NULL REFERENCES departments(id),
+  note          NVARCHAR(MAX) NULL,
+  requested_by  INT NOT NULL REFERENCES users(id),
+  created_at    DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
+  reviewed_by   INT NULL REFERENCES users(id),
+  reviewed_at   DATETIME2(0) NULL,
+  review_note   NVARCHAR(MAX) NULL,
+  delivered_by  INT NULL REFERENCES users(id),
+  delivered_at  DATETIME2(0) NULL,
+  doc_id        INT NULL REFERENCES documents(id),
+  cancelled_at  DATETIME2(0) NULL
+);
+
+IF OBJECT_ID(N'dbo.order_lines', N'U') IS NULL
+CREATE TABLE order_lines (
+  id            INT IDENTITY(1,1) PRIMARY KEY,
+  order_id      INT NOT NULL REFERENCES orders(id),
+  kind          NVARCHAR(20) NOT NULL CHECK (kind IN ('asset','consumable')),
+  consumable_id INT NULL REFERENCES consumables(id),
+  category_id   INT NULL REFERENCES categories(id),
+  name          NVARCHAR(300) NOT NULL,
+  brand         NVARCHAR(200) NOT NULL DEFAULT '',
+  model         NVARCHAR(200) NOT NULL DEFAULT '',
+  qty           INT NOT NULL CHECK (qty > 0),
+  approved_qty  INT NULL CHECK (approved_qty >= 0)
+);
+
 IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NULL
 CREATE TABLE audit_logs (
   id          INT IDENTITY(1,1) PRIMARY KEY,
@@ -309,6 +342,9 @@ IF COL_LENGTH(N'dbo.pending_receipts', N'deleted_at') IS NULL ALTER TABLE pendin
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_pending_status') CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_status') CREATE INDEX idx_orders_status ON orders(status, id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_user') CREATE INDEX idx_orders_user ON orders(requested_by, id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_order_lines') CREATE INDEX idx_order_lines ON order_lines(order_id);
 GO
 
 -- Append-only logs and history (deleting log rows is allowed only past settings.log_retention_days).

@@ -106,6 +106,13 @@ available ──transfer──▶ available (location/department move)
 - Every non-empty row is kept. Each line's `state` is computed when listed: `ready` (SKU matches a consumable) · `new` (SKU not in the system → "สร้างรายการใหม่" dialog on the page creates the consumable with stock 0, or the full form `/assets/new?sku=&name=&unit_cost=`) · `incomplete` (no SKU, SKU with spaces, no qty, or an existing per-unit asset; `problem` says why). SKU/qty/price are edited in the row; only `ready` lines can be received.
 - Anyone with `consumable.move` can come back later, tick ready lines and receive them: one RCV slip via `createReceiveDoc()` (shared with `/receive`), then the lines become `received` with `doc_id`, in the same transaction. Lines can be edited (SKU/qty/price) or `cancelled` while pending; ลบ soft-deletes pending/cancelled lines (`deleted_at`, hidden from every tab, audited) — received lines can't be deleted. Sidebar badge `pendingReceive`.
 
+### คำสั่งเบิก (orders / cart) — `server/routes/orders.js` (`/api/orders`), pages `/shop`, `/orders`, `/orders/:id`
+- Self-service: a user with `order.create` (role **ผู้ขอเบิก** has only this) picks **registered, in-stock** items into a cart (`/shop`, cart kept in localStorage) and sends an order `ORD-YYYYMM-0001` (status `pending`). Items not in the system can't be ordered.
+- Catalog (`GET /api/orders/catalog`) = consumables + available per-unit assets grouped by category/name/brand/model. `available` = on hand − quantities of `approved` (not yet delivered) orders, so approved orders reserve stock. Order lines store that group, not asset ids; actual units (oldest `received_date` first) are picked at delivery.
+- `order.manage`: approve (may lower each line's quantity, 0 = not approved; rechecks stock) → `approved` = รอส่งมอบ; reject (reason required). Deliver → one ISS slip (เบิกถาวร) via `createIssueDoc()` from `documents.js` in the same transaction, then `delivered` + `doc_id`. Requester may cancel while `pending`; managers also while `approved`. Every step is audited.
+- Users without `order.manage` see only their own orders. Sidebar badge `pendingOrders` (managers: pending + approved; requesters: own approved).
+- `db.js` turns `''` params into NULL, so `brand`/`model` (NOT NULL DEFAULT '') are written and matched with `COALESCE(?, '')`.
+
 ### Recipients: free text name + แผนก — `server/recipient.js`
 - Borrow / issue / transfer / stock-out take **typed** `person_name`, `department_name` (UI: `RecipientFields`, inputs with datalist suggestions — no dropdowns).
 - **Name is optional.** A recipient needs a name **or** a department (แผนก) — issuing to a department as a whole leaves `holder_person_id` NULL. Stock-out from the item page needs neither.
@@ -142,7 +149,7 @@ available ──transfer──▶ available (location/department move)
 ### Permissions
 - Permission keys are fine-grained (`asset.view`, `asset.create`, `asset.transact`, `asset.scrap`, `user.manage`, …). Roles are just bundles editable in UI (`/admin/roles`).
 - Server: `requirePerm('asset.edit')` on every mutating route. Client: `can('asset.edit')` only hides UI.
-- Seeded roles: **Admin** (all), **IT Staff** (all except user/role/settings), **Viewer** (read-only).
+- Seeded roles: **Admin** (all), **IT Staff** (all except user/role/settings), **Viewer** (read-only), **ผู้ขอเบิก** (`order.create` only — lands on `/shop`).
 - Menus with their own permission: ยืม-คืน `loan.view`, ประวัติรายการ `history.view`, สแกน QR `scan.use`, พิมพ์สติ๊กเกอร์ `label.print`, พนักงาน `people.view` / `people.manage` (writes to `/api/master/people`; other master tables stay `master.manage`). Their data still comes from asset APIs, so they also need `asset.view`.
 - A permission split out of an older one is listed in `SPLIT_FROM` (`server/permissions.js`); `bootstrap()` grants it to every role holding the older key, so upgrades don't remove access.
 
@@ -196,7 +203,8 @@ available ──transfer──▶ available (location/department move)
 ### Phase 3
 - [x] Stock count sessions: scan per location → summary of found / missing / unexpected
 - [x] Chat assistant (rule-based): type a receive/issue/borrow request → reviewed draft slip → บันทึก
-- [ ] Approval workflow for borrow/issue requests (end-user self-service)
+- [x] คำสั่งเบิก: end-user cart → admin approve/reject → deliver as ISS slip (issue only)
+- [ ] Self-service borrow requests (due date) through the same approval flow
 - [ ] Email/LINE notifications for overdue & warranty
 - [ ] 2FA, AD/SSO
 - [ ] Maintenance cost tracking per repair, depreciation

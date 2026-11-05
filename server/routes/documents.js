@@ -94,7 +94,11 @@ async function checkNotBeforeHistory(assetId, docDate) {
 
 /* ---------- issue ---------- */
 r.post('/issue', requirePerm('asset.transact', 'consumable.move'), async (req, res) => {
-  const b = req.body || {};
+  res.status(201).json(await createIssueDoc(req, req.body || {}));
+});
+
+// Also used by คำสั่งเบิก (orders.js) when an approved order is delivered, inside its own transaction.
+export async function createIssueDoc(req, b) {
   const lines = Array.isArray(b.lines) ? b.lines : [];
   if (!lines.length) throw bad('กรุณาเพิ่มอย่างน้อย 1 รายการ');
   const mode = b.mode === 'borrow' ? 'borrow' : 'issue';
@@ -105,7 +109,7 @@ r.post('/issue', requirePerm('asset.transact', 'consumable.move'), async (req, r
   if (new Set(ids).size !== ids.length) throw bad('มีอุปกรณ์ชิ้นเดียวกันซ้ำในใบเบิก');
   if (mode === 'borrow' && lines.some((l) => l.kind === 'consumable')) throw bad('รายการนับจำนวนเป็นของสิ้นเปลือง ยืมไม่ได้ — ใช้ประเภท “เบิกออก”');
 
-  const result = await tx(async () => {
+  return tx(async () => {
     const who = await resolveRecipient(req, b);
     const { person_id, department_id } = who;
     const doc_no = await nextDocNo('issue', doc_date);
@@ -129,8 +133,7 @@ r.post('/issue', requirePerm('asset.transact', 'consumable.move'), async (req, r
     await audit(req, 'document', docId, 'issue', null, { doc_no, mode, person_id, department_id, lines: lines.length, assets, units });
     return { id: docId, doc_no, assets, units };
   });
-  res.status(201).json(result);
-});
+}
 
 /* ---------- read ---------- */
 const DOC_SELECT = `

@@ -29,6 +29,9 @@ import PendingReceive from './pages/PendingReceive.jsx';
 import Issue from './pages/Issue.jsx';
 import DocumentDetail from './pages/DocumentDetail.jsx';
 import Reports from './pages/Reports.jsx';
+import Shop from './pages/Shop.jsx';
+import Orders from './pages/Orders.jsx';
+import OrderDetail from './pages/OrderDetail.jsx';
 
 function Guard({ perm, children }) {
   const { can } = useAuth();
@@ -46,6 +49,8 @@ function Home() {
   const { can } = useAuth();
   if (can('dashboard.view')) return <Dashboard />;
   if (can('asset.view') || can('consumable.view')) return <Navigate to="/assets" replace />;
+  if (can('order.create')) return <Navigate to="/shop" replace />;
+  if (can('order.manage')) return <Navigate to="/orders" replace />;
   return <Navigate to="/profile" replace />;
 }
 
@@ -78,6 +83,9 @@ export default function App() {
         <Route path="pending-receive" element={g('consumable.view', <PendingReceive />)} />
         <Route path="issue" element={g(['asset.transact', 'consumable.move'], <Issue />)} />
         <Route path="documents/:id" element={g(['asset.view', 'consumable.view'], <DocumentDetail />)} />
+        <Route path="shop" element={g('order.create', <Shop />)} />
+        <Route path="orders" element={g(['order.create', 'order.manage'], <Orders />)} />
+        <Route path="orders/:id" element={g(['order.create', 'order.manage'], <OrderDetail />)} />
         <Route path="reports/issues" element={g('report.view', <Reports />)} />
         <Route path="loans" element={g('loan.view', <Loans />)} />
         <Route path="consumables" element={<Navigate to="/assets" replace />} />

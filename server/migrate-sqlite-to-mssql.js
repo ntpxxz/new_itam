@@ -20,7 +20,7 @@ const { all, get, run, tx, resetMssql, closeDb } = await import('./db.js');
 // Parents before children (foreign keys).
 const ORDER = ['settings', 'permissions', 'roles', 'role_permissions', 'departments', 'locations', 'categories', 'vendors', 'people',
   'users', 'documents', 'assets', 'consumables', 'asset_transactions', 'stock_movements', 'stock_counts', 'stock_count_scans',
-  'pending_batches', 'pending_receipts', 'audit_logs', 'access_logs'];
+  'pending_batches', 'pending_receipts', 'orders', 'order_lines', 'audit_logs', 'access_logs'];
 const DATA_TABLES = ['users', 'assets', 'consumables', 'stock_movements', 'asset_transactions', 'documents', 'people', 'departments', 'categories'];
 
 const lite = new DatabaseSync(src, { readOnly: true });

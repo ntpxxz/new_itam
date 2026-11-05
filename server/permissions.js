@@ -12,6 +12,8 @@ export const PERMISSIONS = [
   ['consumable.manage', 'เพิ่ม / แก้ไขวัสดุสิ้นเปลือง', 'วัสดุสิ้นเปลือง'],
   ['consumable.move', 'รับเข้า / เบิก / ปรับยอด', 'วัสดุสิ้นเปลือง'],
   ['stockcount.manage', 'ตรวจนับ', 'วัสดุสิ้นเปลือง'],
+  ['order.create', 'สั่งเบิกสินค้า (ตะกร้า)', 'สั่งเบิก'],
+  ['order.manage', 'ตรวจสอบ / อนุมัติ / ส่งมอบคำสั่งเบิก', 'สั่งเบิก'],
   ['scan.use', 'สแกน QR', 'เครื่องมือ'],
   ['label.print', 'พิมพ์สติ๊กเกอร์ QR', 'เครื่องมือ'],
   ['people.view', 'ดูรายชื่อพนักงาน', 'พนักงาน'],
@@ -44,6 +46,7 @@ export const DEFAULT_ROLES = [
   { key: 'admin', name: 'Admin', description: 'ทำได้ทุกอย่าง', perms: ALL },
   { key: 'it_staff', name: 'IT Staff', description: 'จัดการอุปกรณ์และวัสดุสิ้นเปลือง', perms: ALL.filter((p) => !ADMIN_ONLY.includes(p)) },
   { key: 'viewer', name: 'Viewer', description: 'ดูข้อมูลอย่างเดียว', perms: ['dashboard.view', 'report.view', 'asset.view', 'consumable.view', 'loan.view', 'history.view', 'scan.use', 'label.print', 'people.view'] },
+  { key: 'requester', name: 'ผู้ขอเบิก', description: 'สั่งเบิกสินค้าจากสต็อกผ่านตะกร้า', perms: ['order.create'] },
 ];
 
 export const DEFAULT_SETTINGS = {

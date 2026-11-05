@@ -405,9 +405,23 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
   .crumbs, .page-head .page-sub { display: none; }
 }
 
+/* ---------- สั่งเบิก (shop + cart) ---------- */
+.shop-layout { grid-template-columns: minmax(0, 1fr) 340px; }
+.shop-cart { position: sticky; top: 76px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.shop-item { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-surface); min-width: 0; }
+.shop-photo { height: 120px; border-radius: var(--radius-sm); background: var(--bg-subtle); display: grid; place-items: center; color: var(--text-subtle); overflow: hidden; position: relative; margin-bottom: 4px; }
+.shop-photo img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: contain; }
+.shop-name { overflow-wrap: anywhere; }
+.cart-line { display: flex; gap: 8px; align-items: flex-start; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.cart-line:last-child { padding-bottom: 0; border-bottom: 0; }
+.qty-stepper { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+.qty-stepper .input { width: 64px; text-align: center; }
+
 /* ---------- Responsive (UI-design.md §6) ---------- */
 @media (max-width: 1099px) {
   .two-col, .detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .shop-cart { position: static; }
   .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 899px) {
@@ -438,6 +452,8 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
   .toasts { left: 16px; right: 16px; bottom: 16px; max-width: none; }
   .asset-photo { width: 88px; height: 88px; }
   .toolbar .input-icon { max-width: none; }
+  .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qty-stepper .icon-btn { width: 44px; height: 44px; }
 }
 @media (max-width: 459px) {
   .kpi-row { grid-template-columns: minmax(0, 1fr); }
