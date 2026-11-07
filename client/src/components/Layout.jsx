@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   LayoutDashboard, Laptop, ArrowLeftRight, History, PackagePlus, PackageMinus, BarChart3, ScanLine, Printer, ClipboardCheck, FileSpreadsheet,
-  Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, Search, Bell, LogOut, KeyRound, Boxes,
-  AlertTriangle, PackageX,
+  Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, Search, LogOut, KeyRound, Boxes,
+  ClipboardList, ShoppingCart, ReceiptText,
 } from 'lucide-react';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
 import { initials } from '../format.js';
+import { useCart } from '../cart.js';
+import NotificationBell from './NotificationBell.jsx';
 import { Menu } from './ui.jsx';
+import AssistantChat from './AssistantChat.jsx';
 
 const NAV = [
   { label: 'ภาพรวม', items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, perm: 'dashboard.view', end: true }] },
@@ -17,9 +20,17 @@ const NAV = [
     items: [
       { to: '/assets', label: 'อุปกรณ์', icon: Laptop, perm: ['asset.view', 'consumable.view'], badge: 'lowStock' },
       { to: '/receive', label: 'รับเข้า', icon: PackagePlus, perm: ['asset.create', 'consumable.move'] },
+      { to: '/pending-receive', label: 'รอรับเข้า', icon: ClipboardList, perm: 'consumable.view', badge: 'pendingReceive' },
       { to: '/issue', label: 'เบิกออก', icon: PackageMinus, perm: ['asset.transact', 'consumable.move'] },
-      { to: '/loans', label: 'ยืม-คืน', icon: ArrowLeftRight, perm: 'asset.view', badge: 'overdue' },
-      { to: '/history', label: 'ประวัติรายการ', icon: History, perm: 'asset.view' },
+      { to: '/loans', label: 'ยืม-คืน', icon: ArrowLeftRight, perm: 'loan.view', badge: 'overdue' },
+      { to: '/history', label: 'ประวัติรายการ', icon: History, perm: 'history.view' },
+    ],
+  },
+  {
+    label: 'สั่งซื้อ',
+    items: [
+      { to: '/shop', label: 'สั่งซื้อสินค้า', icon: ShoppingCart, perm: 'order.create' },
+      { to: '/orders', label: 'ใบสั่งซื้อ', icon: ReceiptText, perm: ['order.create', 'order.manage'], badge: 'pendingOrders' },
     ],
   },
   {
@@ -29,8 +40,8 @@ const NAV = [
   {
     label: 'เครื่องมือ',
     items: [
-      { to: '/scan', label: 'สแกน QR', icon: ScanLine, perm: 'asset.view' },
-      { to: '/labels', label: 'พิมพ์สติ๊กเกอร์', icon: Printer, perm: 'asset.view' },
+      { to: '/scan', label: 'สแกน QR', icon: ScanLine, perm: 'scan.use' },
+      { to: '/labels', label: 'พิมพ์สติ๊กเกอร์', icon: Printer, perm: 'label.print' },
       { to: '/stock-counts', label: 'ตรวจนับ', icon: ClipboardCheck, perm: 'stockcount.manage' },
       { to: '/import', label: 'นำเข้า Excel', icon: FileSpreadsheet, perm: 'data.import' },
     ],
@@ -38,7 +49,7 @@ const NAV = [
   {
     label: 'ตั้งค่า',
     items: [
-      { to: '/people', label: 'พนักงาน', icon: Users, perm: 'asset.view' },
+      { to: '/people', label: 'พนักงาน', icon: Users, perm: 'people.view' },
       { to: '/master', label: 'ข้อมูลหลัก', icon: Database, perm: 'master.manage' },
       { to: '/admin/users', label: 'ผู้ใช้งาน', icon: UserCog, perm: 'user.manage' },
       { to: '/admin/roles', label: 'บทบาทและสิทธิ์', icon: ShieldCheck, perm: 'role.manage' },
@@ -51,16 +62,28 @@ const NAV = [
 export default function Layout() {
   const { user, can, logout } = useAuth();
   const [open, setOpen] = useState(false);
-  const [badges, setBadges] = useState({ overdue: 0, lowStock: 0 });
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('navCollapsed') === '1'; } catch { return false; } });
+  const toggleNav = () => {
+    if (window.matchMedia('(max-width: 759px)').matches) { setOpen(true); return; }
+    setCollapsed((c) => {
+      try { localStorage.setItem('navCollapsed', c ? '0' : '1'); } catch { /* storage blocked */ }
+      return !c;
+    });
+  };
+  const [badges, setBadges] = useState({ overdue: 0, lowStock: 0, pendingReceive: 0, pendingOrders: 0, notifications: 0 });
   const [q, setQ] = useState('');
+  const cart = useCart();
   const searchRef = useRef(null);
   const loc = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => { setOpen(false); }, [loc.pathname]);
+  const loadBadges = () => api.get('/api/dashboard/badges').then(setBadges).catch(() => {});
+  useEffect(() => { loadBadges(); }, [loc.pathname]);
   useEffect(() => {
-    api.get('/api/dashboard/badges').then(setBadges).catch(() => {});
-  }, [loc.pathname]);
+    const t = setInterval(() => { if (!document.hidden) loadBadges(); }, 60000);
+    return () => clearInterval(t);
+  }, []);
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); searchRef.current?.focus(); }
@@ -79,16 +102,15 @@ export default function Layout() {
     searchRef.current?.blur();
   };
 
-  const alertCount = badges.overdue + badges.lowStock;
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
   return (
-    <div className={`shell${open ? ' nav-open' : ''}`}>
+    <div className={`shell${open ? ' nav-open' : ''}${collapsed ? ' nav-collapsed' : ''}`}>
       <aside className="sidebar" aria-label="เมนูหลัก">
         <Link to="/" className="brand" style={{ textDecoration: 'none', color: 'inherit' }}>
           <span className="brand-mark"><Boxes size={18} aria-hidden /></span>
           <span>
-            <div className="brand-name">AssetFlow</div>
+            <div className="brand-name">IT Store</div>
             <div className="brand-sub">ระบบจัดการทรัพย์สินไอที</div>
           </span>
         </Link>
@@ -105,7 +127,7 @@ export default function Layout() {
                     <span>{i.label}</span>
                     {i.badge && badges[i.badge] > 0 && (
                       <span className={`nav-badge${i.badge === 'lowStock' ? ' warn' : ''}`}
-                        aria-label={i.badge === 'overdue' ? `เกินกำหนดคืน ${badges.overdue} รายการ` : `สต็อกต่ำ ${badges.lowStock} รายการ`}>
+                        aria-label={{ overdue: `เกินกำหนดคืน ${badges.overdue} รายการ`, lowStock: `สต็อกต่ำ ${badges.lowStock} รายการ`, pendingReceive: `รอรับเข้า ${badges.pendingReceive} รายการ`, pendingOrders: `ใบสั่งซื้อรอดำเนินการ ${badges.pendingOrders} รายการ` }[i.badge]}>
                         {badges[i.badge]}
                       </span>
                     )}
@@ -129,7 +151,7 @@ export default function Layout() {
 
       <div className="main-col">
         <header className="topbar">
-          <button className="icon-btn hamburger" onClick={() => setOpen(true)} aria-label="เปิดเมนู" aria-expanded={open}>
+          <button className="icon-btn hamburger" onClick={toggleNav} aria-label="แสดง/ซ่อนเมนู" title="แสดง/ซ่อนเมนู">
             <MenuIcon size={18} />
           </button>
           {can('asset.view') || can('consumable.view') ? (
@@ -140,19 +162,15 @@ export default function Layout() {
               <span className="kbd" aria-hidden>{isMac ? '⌘K' : 'Ctrl K'}</span>
             </form>
           ) : <div className="spacer" />}
+          {can('order.create') && (
+            <Link to="/cart" className="icon-btn" aria-label={cart.length ? `ตะกร้า ${cart.length} รายการ` : 'ตะกร้า'} title="ตะกร้า">
+              <ShoppingCart size={18} />{cart.length > 0 && <span className="count mono" aria-hidden>{cart.length}</span>}
+            </Link>
+          )}
           {can('asset.view') && (
             <Link to="/scan" className="icon-btn" aria-label="สแกน QR" title="สแกน QR"><ScanLine size={18} /></Link>
           )}
-          <Menu
-            buttonClass="icon-btn"
-            label={alertCount ? `การแจ้งเตือน ${alertCount} รายการ` : 'การแจ้งเตือน'}
-            icon={<><Bell size={18} />{alertCount > 0 && <span className="dot" aria-hidden />}</>}
-            items={[
-              badges.overdue > 0 && { label: `เกินกำหนดคืน ${badges.overdue} รายการ`, to: '/loans?filter=overdue', icon: <AlertTriangle size={15} /> },
-              badges.lowStock > 0 && { label: `สต็อกต่ำ ${badges.lowStock} รายการ`, to: '/assets?status=low', icon: <PackageX size={15} /> },
-              !alertCount && { label: 'ไม่มีรายการที่ต้องดำเนินการ', onClick: () => {} },
-            ]}
-          />
+          <NotificationBell badges={badges} onChange={loadBadges} />
           <Menu
             label="บัญชีผู้ใช้"
             icon={<span className="avatar" style={{ width: 30, height: 30, fontSize: 12 }}>{initials(user.full_name)}</span>}
@@ -166,6 +184,7 @@ export default function Layout() {
         <main className="content" id="main">
           <Outlet />
         </main>
+        <AssistantChat />
       </div>
     </div>
   );

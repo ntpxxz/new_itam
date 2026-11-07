@@ -12,7 +12,7 @@ const EMPTY = {
   category_id: '', name: '', brand: '', model: '', serial_no: '', specs: '', location_id: '', department_id: '',
   purchase_date: '', purchase_price: '', po_number: '', invoice_number: '', vendor_id: '', warranty_expiry: '', notes: '',
   // quantity-tracked
-  unit: 'ชิ้น', qty_on_hand: '', reorder_point: '5', unit_cost: '',
+  sku: '', unit: 'ชิ้น', qty_on_hand: '', reorder_point: '5', unit_cost: '',
   received_date: '',
 };
 
@@ -27,7 +27,9 @@ export default function AssetForm() {
   const navigate = useNavigate();
   const toast = useToast();
   const { can } = useAuth();
-  const [form, setForm] = useState({ ...EMPTY, category_id: sp.get('category_id') || '', received_date: todayISO() });
+  // ?sku=&name=&unit_cost= prefill a new item (e.g. "สร้างรายการใหม่" from a CSV receive).
+  const [form, setForm] = useState({ ...EMPTY, category_id: sp.get('category_id') || '', sku: sp.get('sku') || '', name: sp.get('name') || '',
+    unit_cost: sp.get('unit_cost') || '', qty_on_hand: sp.get('sku') ? '0' : '', received_date: todayISO() });
   const [tag, setTag] = useState('');
   const [loaded, setLoaded] = useState(!isEdit);
   const [busy, setBusy] = useState(false);
@@ -64,7 +66,7 @@ export default function AssetForm() {
   useEffect(() => {
     if (isEdit) return;
     if (!cat) { setTag(''); return; }
-    if (cat.kind === 'consumable') { setTag(`C-${cat.prefix}-····`); return; }
+    if (cat.kind === 'consumable') { setTag(''); return; }
     api.get('/api/assets/next-tag', { category_id: cat.id }).then((d) => setTag(d.tag)).catch(() => {});
   }, [cat?.id, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -89,6 +91,8 @@ export default function AssetForm() {
       if (form.purchase_price && Number(form.purchase_price) < 0) errs.purchase_price = 'ราคาต้องไม่ติดลบ';
       if (form.warranty_expiry && form.purchase_date && form.warranty_expiry < form.purchase_date) errs.warranty_expiry = 'วันหมดประกันต้องอยู่หลังวันที่ซื้อ';
     } else {
+      if (!form.sku.trim()) errs.sku = 'กรุณากรอก SKU หรือสแกนบาร์โค้ดของสินค้า';
+      else if (/\s/.test(form.sku.trim())) errs.sku = 'SKU ต้องไม่มีช่องว่าง';
       if (form.qty_on_hand !== '' && Number(form.qty_on_hand) < 0) errs.qty_on_hand = 'จำนวนต้องไม่ติดลบ';
       if (Number(form.reorder_point) < 0) errs.reorder_point = 'จุดสั่งซื้อต้องไม่ติดลบ';
     }
@@ -102,11 +106,12 @@ export default function AssetForm() {
         saved = isEdit ? await api.put(`/api/consumables/${id}`, form) : await api.post('/api/consumables', form);
       } else {
         saved = isEdit ? await api.put(`/api/assets/${id}`, form) : await api.post('/api/assets', form);
-        if (image) {
-          const fd = new FormData();
-          fd.append('image', image);
-          await api.post(`/api/assets/${saved.id}/image`, fd).catch((err) => toast.error(`บันทึกข้อมูลแล้ว แต่อัปโหลดรูปไม่สำเร็จ: ${err.message}`));
-        }
+      }
+      if (image) {
+        const fd = new FormData();
+        fd.append('image', image);
+        await api.post(`/api${base}/${saved.id}/image`, fd)
+          .catch((err) => toast.error(`บันทึกข้อมูลแล้ว แต่อัปโหลดรูปไม่สำเร็จ: ${err.message}`));
       }
       toast.success(isEdit ? 'บันทึกการแก้ไขแล้ว' : `เพิ่ม ${saved.asset_tag || saved.sku} แล้ว`);
       navigate(`${base}/${saved.id}`, { replace: true });
@@ -137,11 +142,19 @@ export default function AssetForm() {
                 hint={kind === 'consumable' ? 'หมวดนี้นับเป็นจำนวน (วัสดุสิ้นเปลือง)' : kind === 'asset' ? 'หมวดนี้ติดตามรายชิ้นด้วยรหัสทรัพย์สิน' : 'หมวดหมู่กำหนดวิธีติดตาม: รายชิ้น หรือ นับจำนวน'}>
                 <CategorySelect value={form.category_id} onChange={set('category_id')} categories={cats} />
               </Field>
-              <Field label={kind === 'consumable' ? 'รหัส (SKU)' : 'รหัสทรัพย์สิน'} hint={isEdit ? 'ออกโดยระบบ แก้ไขไม่ได้' : 'ระบบออกให้อัตโนมัติเมื่อบันทึก'}>
-                <div className="input mono row" style={{ background: 'var(--bg-subtle)', color: tag ? 'var(--text)' : 'var(--text-subtle)' }} aria-readonly>
-                  <Tag size={14} aria-hidden />{tag || 'เลือกหมวดหมู่ก่อน'}
-                </div>
-              </Field>
+              {kind === 'consumable' ? (
+                <Field label="SKU (บาร์โค้ด)" required error={errors.sku} hint="สแกนหรือพิมพ์บาร์โค้ดบนกล่องสินค้า ใช้สแกนตอนรับเข้า / เบิกออก">
+                  <input className="input mono" value={form.sku} onChange={set('sku')} maxLength={64}
+                    autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="เช่น 8851234567890"
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }} />
+                </Field>
+              ) : (
+                <Field label="รหัสทรัพย์สิน" hint={isEdit ? 'ออกโดยระบบ แก้ไขไม่ได้' : 'ระบบออกให้อัตโนมัติเมื่อบันทึก'}>
+                  <div className="input mono row" style={{ background: 'var(--bg-subtle)', color: tag ? 'var(--text)' : 'var(--text-subtle)' }} aria-readonly>
+                    <Tag size={14} aria-hidden />{tag || 'เลือกหมวดหมู่ก่อน'}
+                  </div>
+                </Field>
+              )}
               <Field label="ชื่อ" required error={errors.name} className="span-2">
                 <input className="input" value={form.name} onChange={set('name')} maxLength={200}
                   placeholder={kind === 'consumable' ? 'เช่น เมาส์ USB Logitech B100' : 'เช่น โน้ตบุ๊ก Dell Latitude 5440'} />
@@ -215,7 +228,7 @@ export default function AssetForm() {
         </div>
 
         <div className="stack">
-          {kind === 'asset' && (
+          {kind && (
             <Card title="รูปภาพ">
               <label className="stack" style={{ gap: 10, alignItems: 'center', cursor: 'pointer' }}>
                 <div className="asset-photo" style={{ width: '100%', height: 180 }}>

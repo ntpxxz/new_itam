@@ -5,15 +5,14 @@ import MasterTable from '../components/MasterTable.jsx';
 
 export default function People() {
   const depts = useLookup('departments');
+  const deptOptions = depts.map((d) => ({ value: d.id, label: d.name }));
   return (
     <>
       <PageHeader title="พนักงาน" sub="รายชื่อผู้ยืม/ผู้รับอุปกรณ์ (ไม่จำเป็นต้องมีบัญชีเข้าระบบ)" />
-      <MasterTable table="people" title="รายชื่อพนักงาน" addLabel="เพิ่มพนักงาน" searchable columns={[
+      <MasterTable table="people" title="รายชื่อพนักงาน" addLabel="เพิ่มพนักงาน" searchable selectable
+        bulkSet={{ field: 'department_id', label: 'แผนก', options: deptOptions, emptyLabel: '— ไม่ระบุแผนก —' }} columns={[
         { key: 'name', label: 'ชื่อ-นามสกุล', input: 'text', required: true, render: (r) => <Link to={`/assets?q=${encodeURIComponent(r.name)}`}>{r.name}</Link> },
-        { key: 'emp_code', label: 'รหัสพนักงาน', input: 'text', mono: true },
-        { key: 'department_id', label: 'แผนก', input: 'select', options: depts.map((d) => ({ value: d.id, label: d.name })), render: (r) => r.department_name || '—' },
-        { key: 'email', label: 'อีเมล', input: 'email' },
-        { key: 'phone', label: 'โทรศัพท์', input: 'text' },
+        { key: 'department_id', label: 'แผนก', input: 'select', options: deptOptions, render: (r) => r.department_name || '—' },
       ]} />
     </>
   );

@@ -26,7 +26,7 @@ export default function DocumentDetail() {
       <Card className="doc-sheet">
         <div className="doc-head">
           <div>
-            <div className="l-org">AssetFlow · IT Asset Management</div>
+            <div className="l-org">IT Store · IT Asset Management</div>
             <h2 className="doc-title">{title}</h2>
           </div>
           <dl className="dl doc-meta">
@@ -45,7 +45,7 @@ export default function DocumentDetail() {
             </>
           ) : (
             <>
-              <dt>ผู้รับ</dt><dd>{d.person_name || 'ทั้งแผนก (ไม่ระบุชื่อ)'}{d.emp_code && <span className="tag"> ({d.emp_code})</span>}</dd>
+              <dt>ผู้รับ</dt><dd>{d.person_name || 'ทั้งแผนก (ไม่ระบุชื่อ)'}</dd>
               <dt>แผนก</dt><dd>{d.department_name || '—'}</dd>
               <dt>ประเภท</dt><dd>{d.mode === 'borrow' ? <Chip tone="brand">ยืม (ต้องคืน)</Chip> : <Chip tone="brand" dot={false}>เบิกออก</Chip>}</dd>
             </>

@@ -7,11 +7,15 @@ import { useApi, useLookup, useQueryState, useDebounced } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { api, download } from '../api.js';
 import { useToast } from '../components/Toast.jsx';
+import Photo from '../components/Photo.jsx';
 import {
   PageHeader, StatusChip, Pagination, Empty, Loading, Menu, Select, SortHeader, Confirm, CategorySelect, STATUS, KIND_LABEL,
 } from '../components/ui.jsx';
 import { MoveDialog } from '../components/ConsumableDialogs.jsx';
 import { fmtDate, daysFromToday, fmtMoney, fmtNum, who, isHeld } from '../format.js';
+
+const KINDS = [['', 'ทั้งหมด'], ['asset', 'รายชิ้น'], ['consumable', 'วัสดุสิ้นเปลือง']];
+const ASSET_STATUSES = ['available', 'borrowed', 'issued', 'repair', 'pending_disposal', 'scrapped'];
 
 const FILTERS = [
   ['available', STATUS.available], ['borrowed', STATUS.borrowed], ['issued', STATUS.issued], ['repair', STATUS.repair],
@@ -24,7 +28,7 @@ export default function Assets() {
   const { can } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
-  const [f, setF] = useQueryState({ q: '', status: '', category_id: '', location_id: '', page: 1, sort: 'updated_at', dir: 'desc', warranty: '' });
+  const [f, setF] = useQueryState({ q: '', kind: '', status: '', category_id: '', location_id: '', page: 1, sort: 'updated_at', dir: 'desc', warranty: '' });
   const [q, setQ] = useState(f.q);
   const dq = useDebounced(q);
   useEffect(() => { if (dq !== f.q) setF({ q: dq }); }, [dq]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -45,7 +49,18 @@ export default function Assets() {
     assetRows.forEach((r) => (allOnPage ? n.delete(r.id) : n.add(r.id)));
     return n;
   });
-  const filtered = f.q || f.status || f.category_id || f.location_id || f.warranty;
+  const filtered = f.q || f.kind || f.status || f.category_id || f.location_id || f.warranty;
+  const kindCats = f.kind ? cats.filter((c) => c.kind === f.kind) : cats;
+  const statusFilters = FILTERS.filter(([k]) => (f.kind === 'consumable' ? k === 'low' : f.kind === 'asset' ? k !== 'low' : true));
+  // Switching type drops a category/status that belongs to the other type.
+  const setKind = (kind) => {
+    const patch = { kind };
+    const cat = cats.find((c) => String(c.id) === String(f.category_id));
+    if (kind && cat && cat.kind !== kind) patch.category_id = '';
+    if (kind === 'consumable' && ASSET_STATUSES.includes(f.status)) patch.status = '';
+    if (kind === 'asset' && f.status === 'low') patch.status = '';
+    setF(patch);
+  };
   const counts = data?.counts || {};
   const countOf = (k) => (k === 'low' ? (counts.low_stock || 0) + (counts.out_of_stock || 0) : counts[k] || 0);
   const canAdd = can('asset.create') || can('consumable.manage');
@@ -63,7 +78,7 @@ export default function Assets() {
       <PageHeader title="อุปกรณ์" sub="ทะเบียนอุปกรณ์ไอทีทั้งหมด — หมวดหมู่กำหนดว่าติดตามแบบรายชิ้นหรือนับจำนวน">
         {can('data.import') && <Link to="/import" className="btn"><Upload size={16} />นำเข้า Excel</Link>}
         {can('report.export') && (
-          <button className="btn" onClick={() => download('/api/items/export', { category_id: f.category_id })}><Download size={16} />ส่งออก Excel</button>
+          <button className="btn" onClick={() => download('/api/items/export', { category_id: f.category_id, kind: f.kind })}><Download size={16} />ส่งออก Excel</button>
         )}
         {canAdd && <Link to={`/assets/new${f.category_id ? `?category_id=${f.category_id}` : ''}`} className="btn btn-primary"><Plus size={16} />เพิ่มอุปกรณ์</Link>}
       </PageHeader>
@@ -75,12 +90,15 @@ export default function Assets() {
             <input className="input" type="search" placeholder="ค้นหารหัส, ชื่อ, Serial, ยี่ห้อ, ผู้ถือครอง" value={q}
               onChange={(e) => setQ(e.target.value)} aria-label="ค้นหาอุปกรณ์" />
           </div>
-          <CategorySelect value={f.category_id} onChange={(v) => setF({ category_id: v })} categories={cats} placeholder="ทุกหมวดหมู่"
+          <div className="seg" role="group" aria-label="กรองตามประเภท">
+            {KINDS.map(([k, label]) => <button key={k || 'all'} aria-pressed={f.kind === k} onClick={() => setKind(k)}>{label}</button>)}
+          </div>
+          <CategorySelect value={f.category_id} onChange={(v) => setF({ category_id: v })} categories={kindCats} placeholder="ทุกหมวดหมู่"
             aria-label="กรองตามหมวดหมู่" style={{ width: 'auto', minWidth: 160 }} />
           <Select value={f.location_id} onChange={(v) => setF({ location_id: v })} placeholder="ทุกสถานที่"
             options={locs.map((l) => ({ value: l.id, label: l.name }))} aria-label="กรองตามสถานที่" />
           {filtered && (
-            <button className="btn btn-ghost" onClick={() => { setQ(''); setF({ q: '', status: '', category_id: '', location_id: '', warranty: '' }); }}>
+            <button className="btn btn-ghost" onClick={() => { setQ(''); setF({ q: '', kind: '', status: '', category_id: '', location_id: '', warranty: '' }); }}>
               <X size={14} />ล้างตัวกรอง
             </button>
           )}
@@ -88,7 +106,7 @@ export default function Assets() {
         <div className="toolbar" style={{ paddingTop: 10, paddingBottom: 10 }}>
           <div className="seg" role="group" aria-label="กรองตามสถานะ">
             <button aria-pressed={!f.status} onClick={() => setF({ status: '' })}>ทั้งหมด</button>
-            {FILTERS.map(([k, label]) => (
+            {statusFilters.map(([k, label]) => (
               <button key={k} aria-pressed={f.status === k} onClick={() => setF({ status: k })}>
                 {label}<span className="count">{fmtNum(countOf(k))}</span>
               </button>
@@ -99,7 +117,7 @@ export default function Assets() {
           {selected.size > 0 && (
             <div className="row">
               <span className="muted" style={{ fontSize: 13 }}>เลือก <span className="mono">{selected.size}</span> รายการ</span>
-              <button className="btn btn-sm" onClick={() => navigate(`/labels?ids=${[...selected].join(',')}`)}><Printer size={14} />พิมพ์สติ๊กเกอร์</button>
+              {can('label.print') && <button className="btn btn-sm" onClick={() => navigate(`/labels?ids=${[...selected].join(',')}`)}><Printer size={14} />พิมพ์สติ๊กเกอร์</button>}
               <button className="btn btn-sm btn-ghost" onClick={() => setSelected(new Set())}>ยกเลิกเลือก</button>
             </div>
           )}
@@ -173,7 +191,7 @@ function AssetRow({ r, can, selected, onToggle, onOpen, onDelete }) {
       </td>
       <td>
         <div className="row" style={{ gap: 10 }}>
-          <span className="thumb">{r.image_path ? <img src={r.image_path} alt="" loading="lazy" /> : <Laptop size={16} />}</span>
+          <Photo src={r.image_path} alt={r.name} icon={Laptop} />
           <div style={{ minWidth: 0 }}>
             <Link to={`/assets/${r.id}`} className="cell-main" onClick={(e) => e.stopPropagation()}>{r.name}</Link>
             <div className="tag">{r.code}{r.serial_no && <span> · SN {r.serial_no}</span>}</div>
@@ -198,7 +216,7 @@ function AssetRow({ r, can, selected, onToggle, onOpen, onDelete }) {
         <Menu items={[
           { label: 'ดูรายละเอียด', to: `/assets/${r.id}`, icon: <Eye size={15} /> },
           can('asset.edit') && r.status !== 'scrapped' && { label: 'แก้ไข', to: `/assets/${r.id}/edit`, icon: <Pencil size={15} /> },
-          { label: 'พิมพ์สติ๊กเกอร์', to: `/labels?ids=${r.id}`, icon: <Printer size={15} /> },
+          can('label.print') && { label: 'พิมพ์สติ๊กเกอร์', to: `/labels?ids=${r.id}`, icon: <Printer size={15} /> },
           deletable && '-',
           deletable && { label: 'ลบ', onClick: onDelete, icon: <Trash2 size={15} />, danger: true },
         ]} />
@@ -215,7 +233,7 @@ function StockRow({ r, can, onOpen, onMove, onDelete }) {
       <td />
       <td>
         <div className="row" style={{ gap: 10 }}>
-          <span className="thumb"><Package size={16} /></span>
+          <Photo src={r.image_path} alt={r.name} icon={Package} />
           <div style={{ minWidth: 0 }}>
             <Link to={`/consumables/${r.id}`} className="cell-main" onClick={(e) => e.stopPropagation()}>{r.name}</Link>
             <div className="tag">{r.code}</div>

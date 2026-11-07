@@ -5,13 +5,15 @@ import { api } from '../api.js';
 import { useLookup } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Field, Select, Empty } from '../components/ui.jsx';
+import { PageHeader, Card, Field, Select, Empty, CategorySelect, KIND_LABEL } from '../components/ui.jsx';
 import ItemPicker from '../components/ItemPicker.jsx';
 import DocList from '../components/DocList.jsx';
 import { fmtMoney, fmtNum, todayISO, daysFromToday } from '../format.js';
 
 let seq = 1;
-const newAssetLine = () => ({ key: seq++, kind: 'asset', category_id: '', name: '', brand: '', model: '', qty: '1', unit_price: '', warranty_expiry: '', serialsText: '' });
+// A "new item" line becomes per-unit assets or a new consumable depending on the chosen category's kind.
+const newItemLine = () => ({ key: seq++, kind: 'new', category_id: '', name: '', brand: '', model: '', qty: '1', unit_price: '', warranty_expiry: '', serialsText: '',
+  sku: '', unit: 'ชิ้น', reorder_point: '' });
 const serialsOf = (l) => l.serialsText.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
 const assetQty = (l) => Math.max(serialsOf(l).length, parseInt(l.qty, 10) || 0);
 
@@ -21,13 +23,19 @@ export default function Receive() {
   const navigate = useNavigate();
   const vendors = useLookup('vendors');
   const locs = useLookup('locations');
-  const cats = useLookup('categories', { kind: 'asset' });
+  const allCats = useLookup('categories');
   const [head, setHead] = useState({ doc_date: todayISO(), purchase_date: '', vendor_id: '', po_number: '', invoice_number: '', location_id: '', note: '' });
   const [lines, setLines] = useState([]);
   const [busy, setBusy] = useState(false);
   const [errs, setErrs] = useState({});
   const canCons = can('consumable.move');
   const canAsset = can('asset.create');
+  const canNewCons = canCons && can('consumable.manage');
+  const cats = allCats.filter((c) => (c.kind === 'asset' ? canAsset : canNewCons));
+  const canNew = canAsset || canNewCons;
+  // Effective kind of a line: new lines follow their category (per-unit until one is chosen).
+  const kindOf = (l) => (l.kind !== 'new' ? l.kind : cats.find((c) => String(c.id) === String(l.category_id))?.kind || 'asset');
+  const qtyOf = (l) => (kindOf(l) === 'asset' ? assetQty(l) : parseInt(l.qty, 10) || 0);
 
   const setH = (k) => (v) => setHead((h) => ({ ...h, [k]: v?.target ? v.target.value : v }));
   const update = (key, patch) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -41,11 +49,9 @@ export default function Receive() {
     });
   };
 
-  const total = lines.reduce((s, l) => s + (l.kind === 'consumable'
-    ? (parseInt(l.qty, 10) || 0) * (Number(l.unit_cost) || 0)
-    : assetQty(l) * (Number(l.unit_price) || 0)), 0);
-  const assetCount = lines.filter((l) => l.kind === 'asset').reduce((s, l) => s + assetQty(l), 0);
-  const unitCount = lines.filter((l) => l.kind === 'consumable').reduce((s, l) => s + (parseInt(l.qty, 10) || 0), 0);
+  const total = lines.reduce((s, l) => s + qtyOf(l) * (Number(l.kind === 'consumable' ? l.unit_cost : l.unit_price) || 0), 0);
+  const assetCount = lines.filter((l) => kindOf(l) === 'asset').reduce((s, l) => s + qtyOf(l), 0);
+  const unitCount = lines.filter((l) => kindOf(l) === 'consumable').reduce((s, l) => s + qtyOf(l), 0);
 
   const submit = async () => {
     const e = {};
@@ -54,10 +60,16 @@ export default function Receive() {
     if (head.purchase_date && head.doc_date && head.purchase_date > head.doc_date) e.purchase_date = 'วันที่ซื้อต้องไม่หลังวันที่รับเข้า';
     lines.forEach((l) => {
       if (l.kind === 'consumable' && !(parseInt(l.qty, 10) > 0)) e[`q${l.key}`] = 'จำนวนต้องมากกว่า 0';
-      if (l.kind === 'asset') {
+      if (l.kind === 'new') {
         if (!l.category_id) e[`c${l.key}`] = 'เลือกหมวดหมู่';
         if (!l.name.trim()) e[`n${l.key}`] = 'กรอกชื่อ';
-        if (!(assetQty(l) > 0)) e[`q${l.key}`] = 'จำนวนต้องมากกว่า 0';
+        if (!(qtyOf(l) > 0)) e[`q${l.key}`] = 'จำนวนต้องมากกว่า 0';
+        if (kindOf(l) === 'consumable') {
+          const sku = l.sku.trim();
+          if (!sku) e[`s${l.key}`] = 'กรอกหรือสแกนบาร์โค้ด';
+          else if (/\s/.test(sku) || sku.length > 64) e[`s${l.key}`] = 'ต้องไม่มีช่องว่าง และยาวไม่เกิน 64 ตัวอักษร';
+          else if (lines.some((o) => o !== l && o.kind === 'new' && kindOf(o) === 'consumable' && o.sku.trim().toLowerCase() === sku.toLowerCase())) e[`s${l.key}`] = 'SKU ซ้ำกับรายการอื่นในใบนี้';
+        }
       }
     });
     setErrs(e);
@@ -66,9 +78,13 @@ export default function Receive() {
     try {
       const body = {
         ...head,
-        lines: lines.map((l) => (l.kind === 'consumable'
-          ? { kind: 'consumable', consumable_id: l.item.id, qty: parseInt(l.qty, 10), unit_cost: l.unit_cost }
-          : { kind: 'asset', category_id: l.category_id, name: l.name, brand: l.brand, model: l.model, qty: assetQty(l), unit_price: l.unit_price, warranty_expiry: l.warranty_expiry, serials: serialsOf(l) })),
+        lines: lines.map((l) => {
+          if (l.kind === 'consumable') return { kind: 'consumable', consumable_id: l.item.id, qty: parseInt(l.qty, 10), unit_cost: l.unit_cost };
+          if (kindOf(l) === 'consumable') {
+            return { kind: 'consumable', category_id: l.category_id, sku: l.sku.trim(), name: l.name, unit: l.unit, reorder_point: l.reorder_point, qty: qtyOf(l), unit_cost: l.unit_price };
+          }
+          return { kind: 'asset', category_id: l.category_id, name: l.name, brand: l.brand, model: l.model, qty: assetQty(l), unit_price: l.unit_price, warranty_expiry: l.warranty_expiry, serials: serialsOf(l) };
+        }),
       };
       const r = await api.post('/api/documents/receive', body);
       toast.success(`บันทึกใบรับเข้า ${r.doc_no} แล้ว`);
@@ -101,23 +117,21 @@ export default function Receive() {
         </div>
       </Card>
 
-      <Card title="รายการที่รับเข้า" actions={canAsset && (
-        <button className="btn btn-sm" onClick={() => setLines((ls) => [...ls, newAssetLine()])}><Plus size={14} />อุปกรณ์ใหม่ (รายชิ้น)</button>
+      <Card title="รายการที่รับเข้า" actions={canNew && (
+        <button className="btn btn-sm" onClick={() => setLines((ls) => [...ls, newItemLine()])}><Plus size={14} />รายการใหม่</button>
       )}>
         <div className="stack" style={{ gap: 12 }}>
           {canCons && (
             <div>
               <ItemPicker onPick={addConsumable} accept={(r) => r.kind === 'consumable'}
-                reason={() => 'อุปกรณ์รายชิ้นแต่ละชิ้นรับเข้าได้ครั้งเดียว — กด “อุปกรณ์ใหม่ (รายชิ้น)” เพื่อเพิ่มชิ้นใหม่'}
-                placeholder="ค้นหาหรือสแกนรายการนับจำนวน (เช่น เมาส์, สาย LAN) เพื่อเพิ่มยอด" />
-              <p className="field-hint" style={{ marginTop: 6 }}>
-                ยังไม่มีรายการนี้ในระบบ? <Link to="/assets/new">สร้างรายการใหม่</Link> ก่อน แล้วกลับมารับเข้า
-              </p>
+                reason={() => 'อุปกรณ์รายชิ้นแต่ละชิ้นรับเข้าได้ครั้งเดียว — กด “รายการใหม่” เพื่อเพิ่มชิ้นใหม่'}
+                placeholder="ค้นหาหรือสแกนรายการนับจำนวนที่มีอยู่ (เช่น เมาส์, สาย LAN) เพื่อเพิ่มยอด" />
+              {canNew && <p className="field-hint" style={{ marginTop: 6 }}>ยังไม่มีรายการนี้ในระบบ? กด “รายการใหม่” — เลือกหมวดหมู่ได้ทั้งแบบรายชิ้นและนับจำนวน</p>}
             </div>
           )}
 
           {!lines.length ? (
-            <Empty icon={PackagePlus} title="ยังไม่มีรายการ">ค้นหา/สแกนรายการนับจำนวน หรือกด “อุปกรณ์ใหม่ (รายชิ้น)”</Empty>
+            <Empty icon={PackagePlus} title="ยังไม่มีรายการ">ค้นหา/สแกนรายการที่มีอยู่ หรือกด “รายการใหม่”</Empty>
           ) : lines.map((l, i) => (l.kind === 'consumable' ? (
             <div key={l.key} className="line-card">
               <span className="line-no mono">{i + 1}</span>
@@ -135,13 +149,47 @@ export default function Receive() {
               <div className="line-total mono">{fmtMoney((parseInt(l.qty, 10) || 0) * (Number(l.unit_cost) || 0))}</div>
               <button className="icon-btn plain" onClick={() => remove(l.key)} aria-label={`ลบรายการ ${l.item.name}`}><Trash2 size={16} /></button>
             </div>
+          ) : kindOf(l) === 'consumable' ? (
+            <div key={l.key} className="line-card" style={{ alignItems: 'flex-start' }}>
+              <span className="line-no mono">{i + 1}</span>
+              <span className="thumb"><Package size={16} /></span>
+              <div className="form-grid cols-3" style={{ flex: 1, minWidth: 0 }}>
+                <Field label="หมวดหมู่" required error={errs[`c${l.key}`]} hint={`${KIND_LABEL.consumable} — สร้างรายการใหม่และรับเข้าสต็อก`}>
+                  <CategorySelect value={l.category_id} onChange={(v) => update(l.key, { category_id: v })} categories={cats} />
+                </Field>
+                <Field label="ชื่อ" required error={errs[`n${l.key}`]} className="span-2">
+                  <input className="input" value={l.name} onChange={(e) => update(l.key, { name: e.target.value })} placeholder="เช่น เมาส์ USB Logitech B100" />
+                </Field>
+                <Field label="SKU (บาร์โค้ด)" required error={errs[`s${l.key}`]} hint="สแกนหรือพิมพ์บาร์โค้ดของสินค้า">
+                  <input className="input mono" value={l.sku} onChange={(e) => update(l.key, { sku: e.target.value })} />
+                </Field>
+                <Field label="หน่วยนับ"><input className="input" value={l.unit} onChange={(e) => update(l.key, { unit: e.target.value })} placeholder="ชิ้น, เส้น, ตลับ" /></Field>
+                <Field label="จุดสั่งซื้อ" hint="แจ้งเตือนเมื่อคงเหลือ ≤ ค่านี้">
+                  <input type="number" min="0" inputMode="numeric" className="input mono" value={l.reorder_point} onChange={(e) => update(l.key, { reorder_point: e.target.value })} />
+                </Field>
+                <Field label={`จำนวน (${l.unit || 'ชิ้น'})`} required error={errs[`q${l.key}`]}>
+                  <input type="number" min="1" inputMode="numeric" className="input mono" value={l.qty} onChange={(e) => update(l.key, { qty: e.target.value })} />
+                </Field>
+                <Field label="ราคา/หน่วย (บาท)">
+                  <input type="number" min="0" step="0.01" inputMode="decimal" className="input mono" value={l.unit_price} onChange={(e) => update(l.key, { unit_price: e.target.value })} />
+                </Field>
+                <Field label="รวม"><div className="input mono" style={{ background: 'var(--bg-subtle)' }}>{fmtMoney(qtyOf(l) * (Number(l.unit_price) || 0))}</div></Field>
+              </div>
+              <button className="icon-btn plain" onClick={() => remove(l.key)} aria-label={`ลบรายการที่ ${i + 1}`}><Trash2 size={16} /></button>
+            </div>
           ) : (
             <div key={l.key} className="line-card" style={{ alignItems: 'flex-start' }}>
               <span className="line-no mono">{i + 1}</span>
               <span className="thumb"><Laptop size={16} /></span>
               <div className="form-grid cols-3" style={{ flex: 1, minWidth: 0 }}>
-                <Field label="หมวดหมู่" required error={errs[`c${l.key}`]}>
-                  <Select value={l.category_id} onChange={(v) => update(l.key, { category_id: v })} options={cats.map((c) => ({ value: c.id, label: c.name }))} />
+                <Field label="หมวดหมู่" required error={errs[`c${l.key}`]}
+                  hint={!cats.length
+                    ? (can('master.manage')
+                      ? <>ยังไม่มีหมวดหมู่ — <Link to="/master?tab=categories">เพิ่มหมวดหมู่</Link> ก่อน</>
+                      : 'ยังไม่มีหมวดหมู่ — ให้ผู้ดูแลระบบเพิ่มที่ ข้อมูลหลัก → หมวดหมู่')
+                    : l.category_id ? `${KIND_LABEL.asset} — ระบบออกรหัสทรัพย์สินให้ทุกชิ้น` : 'เลือกได้ทั้งแบบรายชิ้นและนับจำนวน'}>
+                  <CategorySelect value={l.category_id} onChange={(v) => update(l.key, { category_id: v })} categories={cats}
+                    placeholder={cats.length ? undefined : '— ยังไม่มีหมวดหมู่ —'} />
                 </Field>
                 <Field label="ชื่อ" required error={errs[`n${l.key}`]} className="span-2">
                   <input className="input" value={l.name} onChange={(e) => update(l.key, { name: e.target.value })} placeholder="เช่น โน้ตบุ๊ก Dell Latitude 5440" />

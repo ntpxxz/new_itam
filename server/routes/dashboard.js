@@ -1,49 +1,53 @@
 import { Router } from 'express';
-import { all, get, setting } from '../db.js';
+import { all, get, setting, ym } from '../db.js';
 import { requirePerm, requireAuth, can } from '../auth.js';
+import { today, addDays, monthStart } from './util.js';
 
 const r = Router();
 
-r.get('/', requirePerm('dashboard.view'), (req, res) => {
-  const days = Number(setting('warranty_alert_days', '30'));
-  const counts = Object.fromEntries(all(`SELECT status, COUNT(*) n FROM assets WHERE deleted_at IS NULL GROUP BY status`).map((r) => [r.status, r.n]));
+r.get('/', requirePerm('dashboard.view'), async (req, res) => {
+  const days = Number(await setting('warranty_alert_days', '30'));
+  const d0 = today();
+  const counts = Object.fromEntries((await all(`SELECT status, COUNT(*) n FROM assets WHERE deleted_at IS NULL GROUP BY status`)).map((r) => [r.status, r.n]));
   const total = Object.entries(counts).filter(([s]) => s !== 'scrapped').reduce((a, [, n]) => a + n, 0);
 
-  const overdue = all(`
+  const overdue = await all(`
     SELECT a.id, a.asset_tag, a.name, a.due_date, p.name holder_name, d.name department_name
     FROM assets a LEFT JOIN people p ON p.id = a.holder_person_id LEFT JOIN departments d ON d.id = a.department_id
-    WHERE a.deleted_at IS NULL AND a.status = 'borrowed' AND a.due_date < date('now','localtime')
-    ORDER BY a.due_date LIMIT 50`);
-  const dueSoon = get(`SELECT COUNT(*) n FROM assets WHERE deleted_at IS NULL AND status='borrowed'
-    AND due_date BETWEEN date('now','localtime') AND date('now','localtime','+3 days')`).n;
-  const warranty = all(`
+    WHERE a.deleted_at IS NULL AND a.status = 'borrowed' AND a.due_date < ?
+    ORDER BY a.due_date LIMIT 50`, d0);
+  const dueSoon = (await get(`SELECT COUNT(*) n FROM assets WHERE deleted_at IS NULL AND status='borrowed'
+    AND due_date BETWEEN ? AND ?`, d0, addDays(d0, 3))).n;
+  const warranty = await all(`
     SELECT id, asset_tag, name, warranty_expiry FROM assets
     WHERE deleted_at IS NULL AND status <> 'scrapped'
-      AND warranty_expiry BETWEEN date('now','localtime') AND date('now','localtime', ?)
-    ORDER BY warranty_expiry LIMIT 50`, `+${days} days`);
-  const lowStock = all(`SELECT id, sku, name, qty_on_hand, reorder_point, unit FROM consumables
-    WHERE deleted_at IS NULL AND qty_on_hand <= reorder_point ORDER BY (qty_on_hand * 1.0 / MAX(reorder_point,1))`);
+      AND warranty_expiry BETWEEN ? AND ?
+    ORDER BY warranty_expiry LIMIT 50`, d0, addDays(d0, days));
+  const lowStock = await all(`SELECT id, sku, name, qty_on_hand, reorder_point, unit FROM consumables
+    WHERE deleted_at IS NULL AND qty_on_hand <= reorder_point
+    ORDER BY qty_on_hand * 1.0 / CASE WHEN reorder_point > 1 THEN reorder_point ELSE 1 END`);
 
   // Monthly spend: assets purchased + consumables received (last 6 months)
-  const spend = all(`
-    WITH months(m) AS (SELECT strftime('%Y-%m', date('now','localtime','start of month', '-' || n || ' months'))
-                       FROM (SELECT 0 n UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5))
-    SELECT m AS month,
-      COALESCE((SELECT SUM(purchase_price) FROM assets WHERE deleted_at IS NULL AND strftime('%Y-%m', purchase_date) = m), 0) AS assets,
-      COALESCE((SELECT SUM(qty * COALESCE(unit_cost,0)) FROM stock_movements WHERE type='in' AND note <> 'ยอดยกมา' AND strftime('%Y-%m', COALESCE(received_date, created_at)) = m), 0) AS consumables
-    FROM months ORDER BY m`);
+  const from = monthStart(d0, 5);
+  const months = [5, 4, 3, 2, 1, 0].map((n) => monthStart(d0, n).slice(0, 7));
+  const byMonth = async (sql) => new Map((await all(sql, from)).map((x) => [x.m, Number(x.v) || 0]));
+  const assetSpend = await byMonth(`SELECT ${ym('purchase_date')} m, SUM(purchase_price) v FROM assets
+    WHERE deleted_at IS NULL AND purchase_date >= ? GROUP BY ${ym('purchase_date')}`);
+  const consSpend = await byMonth(`SELECT ${ym('COALESCE(received_date, created_at)')} m, SUM(qty * COALESCE(unit_cost,0)) v FROM stock_movements
+    WHERE type='in' AND note <> 'ยอดยกมา' AND COALESCE(received_date, created_at) >= ? GROUP BY ${ym('COALESCE(received_date, created_at)')}`);
+  const spend = months.map((m) => ({ month: m, assets: assetSpend.get(m) || 0, consumables: consSpend.get(m) || 0 }));
 
-  const byCategory = all(`SELECT c.name, COUNT(*) n FROM assets a JOIN categories c ON c.id = a.category_id
-    WHERE a.deleted_at IS NULL AND a.status <> 'scrapped' GROUP BY c.id ORDER BY n DESC LIMIT 8`);
+  const byCategory = await all(`SELECT c.name, COUNT(*) n FROM assets a JOIN categories c ON c.id = a.category_id
+    WHERE a.deleted_at IS NULL AND a.status <> 'scrapped' GROUP BY c.id, c.name ORDER BY n DESC LIMIT 8`);
 
-  const issuedThisMonth = get(`SELECT COALESCE(SUM(m.qty),0) n FROM stock_movements m LEFT JOIN documents d ON d.id = m.doc_id
-    WHERE m.type='out' AND COALESCE(d.doc_date, m.created_at) >= date('now','localtime','start of month')`).n;
+  const issuedThisMonth = (await get(`SELECT COALESCE(SUM(m.qty),0) n FROM stock_movements m LEFT JOIN documents d ON d.id = m.doc_id
+    WHERE m.type='out' AND COALESCE(d.doc_date, m.created_at) >= ?`, monthStart(d0))).n;
 
   res.json({ counts, total, overdue, dueSoon, warranty, warrantyDays: days, lowStock, spend, byCategory, issuedThisMonth });
 });
 
 // Merged feed of asset transactions + stock movements
-r.get('/activity', requireAuth, (req, res) => {
+r.get('/activity', requireAuth, async (req, res) => {
   const limit = Math.min(100, parseInt(req.query.limit, 10) || 20);
   const parts = [];
   if (can(req.user, 'asset.view')) {
@@ -57,14 +61,18 @@ r.get('/activity', requireAuth, (req, res) => {
       FROM stock_movements m JOIN consumables x ON x.id = m.consumable_id LEFT JOIN people p ON p.id = m.person_id LEFT JOIN users u ON u.id = m.performed_by`);
   }
   if (!parts.length) return res.json({ rows: [] });
-  res.json({ rows: all(`SELECT * FROM (${parts.join(' UNION ALL ')}) ORDER BY created_at DESC, id DESC LIMIT ?`, limit) });
+  res.json({ rows: await all(`SELECT * FROM (${parts.join(' UNION ALL ')}) f ORDER BY created_at DESC, id DESC LIMIT ?`, limit) });
 });
 
 // Sidebar badges
-r.get('/badges', requireAuth, (req, res) => {
+r.get('/badges', requireAuth, async (req, res) => {
   res.json({
-    overdue: can(req.user, 'asset.view') ? get(`SELECT COUNT(*) n FROM assets WHERE deleted_at IS NULL AND status='borrowed' AND due_date < date('now','localtime')`).n : 0,
-    lowStock: can(req.user, 'consumable.view') ? get('SELECT COUNT(*) n FROM consumables WHERE deleted_at IS NULL AND qty_on_hand <= reorder_point').n : 0,
+    overdue: can(req.user, 'asset.view') ? (await get(`SELECT COUNT(*) n FROM assets WHERE deleted_at IS NULL AND status='borrowed' AND due_date < ?`, today())).n : 0,
+    lowStock: can(req.user, 'consumable.view') ? (await get('SELECT COUNT(*) n FROM consumables WHERE deleted_at IS NULL AND qty_on_hand <= reorder_point')).n : 0,
+    pendingReceive: can(req.user, 'consumable.view') ? (await get(`SELECT COUNT(*) n FROM pending_receipts WHERE status = 'pending' AND deleted_at IS NULL`)).n : 0,
+    // Purchase orders waiting for approval (approved lines are counted in pendingReceive).
+    pendingOrders: can(req.user, 'order.manage') ? (await get(`SELECT COUNT(*) n FROM orders WHERE status = 'pending'`)).n : 0,
+    notifications: (await get('SELECT COUNT(*) n FROM notifications WHERE user_id = ? AND read_at IS NULL', req.user.id)).n,
   });
 });
 

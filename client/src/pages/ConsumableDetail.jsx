@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { PackageMinus, PackagePlus, SlidersHorizontal, Pencil, Trash2, AlertTriangle } from 'lucide-react';
-import { useApi } from '../hooks.js';
+import { PackageMinus, PackagePlus, SlidersHorizontal, Pencil, Trash2, AlertTriangle, Package, MapPin } from 'lucide-react';
+import { useApi, useLookup } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Loading, Empty, Menu, Confirm } from '../components/ui.jsx';
+import { PageHeader, Card, Loading, Empty, Menu, Confirm, Modal, Field, Select } from '../components/ui.jsx';
 import { MoveDialog } from '../components/ConsumableDialogs.jsx';
+import ItemPhoto from '../components/ItemPhoto.jsx';
 import { STOCK_META, ActionIcon } from '../components/actions.jsx';
 import { fmtNum, fmtMoney, fmtDateTime, fmtDate, fmtMonth, who } from '../format.js';
 
@@ -18,6 +19,7 @@ export default function ConsumableDetail() {
   const { data, loading, reload } = useApi(`/api/consumables/${id}`);
   const [move, setMove] = useState(null);
   const [del, setDel] = useState(false);
+  const [moveLoc, setMoveLoc] = useState(false);
 
   if (loading && !data) return <Card><Loading rows={8} /></Card>;
   if (!data) return <Empty title="ไม่พบวัสดุ"><Link to="/consumables">กลับไปหน้ารายการ</Link></Empty>;
@@ -54,33 +56,53 @@ export default function ConsumableDetail() {
       </div>
 
       <div className="detail-grid">
-        <Card title="ความเคลื่อนไหว" noBody>
-          {!movements.length ? <Empty title="ยังไม่มีรายการ" /> : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead><tr><th>วันที่</th><th>รายการ</th><th className="text-right">จำนวน</th><th className="text-right">คงเหลือ</th><th>ผู้รับ / หมายเหตุ</th><th>ผู้ทำรายการ</th></tr></thead>
-                <tbody>
-                  {movements.map((m) => {
-                    const meta = STOCK_META[m.type];
-                    const sign = m.type === 'out' ? '−' : m.qty > 0 ? '+' : m.qty < 0 ? '−' : '';
-                    return (
-                      <tr key={m.id}>
-                        <td className="nowrap">
-                          {m.doc_date && m.type === 'out' ? <><div>เบิก {fmtDate(m.doc_date)}</div><div className="cell-sub">บันทึก {fmtDateTime(m.created_at)}</div></> : m.received_date ? <><div>รับเข้า {fmtDate(m.received_date)}</div><div className="cell-sub">บันทึก {fmtDateTime(m.created_at)}</div></> : <span className="muted">{fmtDateTime(m.created_at)}</span>}
-                        </td>
-                        <td><div className="row" style={{ gap: 8 }}><ActionIcon meta={meta} size={12} />{meta.label}</div></td>
-                        <td className="text-right mono">{sign}{fmtNum(Math.abs(m.qty))}</td>
-                        <td className="text-right mono">{fmtNum(m.balance_after)}</td>
-                        <td>{(m.person_name || m.department_name) && <div>{who(m.person_name, m.department_name)}{m.person_name && <span className="cell-sub"> · {m.department_name || 'ไม่ระบุแผนก'}</span>}</div>}{m.note && <div className="cell-sub">{m.note}</div>}{m.doc_no && <Link to={`/documents/${m.doc_id}`} className="mono" style={{ fontSize: 12 }}>{m.doc_no}</Link>}</td>
-                        <td className="muted">{m.performed_by_name}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        <div className="stack">
+          <Card title="ข้อมูล">
+            <div className="asset-hero">
+              <ItemPhoto src={x.image_path} alt={x.name} icon={Package} uploadUrl={`/api/consumables/${x.id}/image`}
+                canEdit={can('consumable.manage')} onDone={reload} />
+              <dl className="dl" style={{ flex: 1, minWidth: 0 }}>
+                <dt>SKU</dt><dd className="mono">{x.sku}</dd>
+                <dt>หมวดหมู่</dt><dd>{x.category_name}</dd>
+                <dt>ราคา/หน่วย</dt><dd className="mono">{fmtMoney(x.unit_cost)}</dd>
+                <dt>สถานที่เก็บ</dt>
+                <dd className="row-wrap" style={{ gap: 6, justifyContent: 'space-between' }}>
+                  <span>{x.location_name || '—'}</span>
+                  {can('consumable.manage') && <button className="btn btn-sm" onClick={() => setMoveLoc(true)}><MapPin size={14} />เปลี่ยนที่เก็บ</button>}
+                </dd>
+                <dt>ผู้ขาย</dt><dd>{x.vendor_name || '—'}</dd>
+                <dt>หมายเหตุ</dt><dd>{x.notes || '—'}</dd>
+              </dl>
             </div>
-          )}
-        </Card>
+          </Card>
+          <Card title="ความเคลื่อนไหว" noBody>
+            {!movements.length ? <Empty title="ยังไม่มีรายการ" /> : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead><tr><th>วันที่</th><th>รายการ</th><th className="text-right">จำนวน</th><th className="text-right">คงเหลือ</th><th>ผู้รับ / หมายเหตุ</th><th>ผู้ทำรายการ</th></tr></thead>
+                  <tbody>
+                    {movements.map((m) => {
+                      const meta = STOCK_META[m.type];
+                      const sign = m.type === 'out' ? '−' : m.qty > 0 ? '+' : m.qty < 0 ? '−' : '';
+                      return (
+                        <tr key={m.id}>
+                          <td className="nowrap">
+                            {m.doc_date && m.type === 'out' ? <><div>เบิก {fmtDate(m.doc_date)}</div><div className="cell-sub">บันทึก {fmtDateTime(m.created_at)}</div></> : m.received_date ? <><div>รับเข้า {fmtDate(m.received_date)}</div><div className="cell-sub">บันทึก {fmtDateTime(m.created_at)}</div></> : <span className="muted">{fmtDateTime(m.created_at)}</span>}
+                          </td>
+                          <td><div className="row" style={{ gap: 8 }}><ActionIcon meta={meta} size={12} />{meta.label}</div></td>
+                          <td className="text-right mono">{sign}{fmtNum(Math.abs(m.qty))}</td>
+                          <td className="text-right mono">{fmtNum(m.balance_after)}</td>
+                          <td>{(m.person_name || m.department_name) && <div>{who(m.person_name, m.department_name)}{m.person_name && <span className="cell-sub"> · {m.department_name || 'ไม่ระบุแผนก'}</span>}</div>}{m.note && <div className="cell-sub">{m.note}</div>}{m.doc_no && <Link to={`/documents/${m.doc_id}`} className="mono" style={{ fontSize: 12 }}>{m.doc_no}</Link>}</td>
+                          <td className="muted">{m.performed_by_name}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
         <div className="stack">
           <Card title="การเบิกรายเดือน">
             {!usage.length ? <p className="muted">ยังไม่มีการเบิกใน 6 เดือนที่ผ่านมา</p> : (
@@ -95,25 +117,44 @@ export default function ConsumableDetail() {
               </div>
             )}
           </Card>
-          <Card title="ข้อมูล">
-            <dl className="dl">
-              <dt>SKU</dt><dd className="mono">{x.sku}</dd>
-              <dt>หมวดหมู่</dt><dd>{x.category_name}</dd>
-              <dt>ราคา/หน่วย</dt><dd className="mono">{fmtMoney(x.unit_cost)}</dd>
-              <dt>สถานที่เก็บ</dt><dd>{x.location_name || '—'}</dd>
-              <dt>ผู้ขาย</dt><dd>{x.vendor_name || '—'}</dd>
-              <dt>หมายเหตุ</dt><dd>{x.notes || '—'}</dd>
-            </dl>
-          </Card>
         </div>
       </div>
 
       {move && <MoveDialog item={x} type={move} onClose={() => setMove(null)} onDone={() => { setMove(null); reload(); }} />}
+      {moveLoc && <LocationDialog item={x} onClose={() => setMoveLoc(false)} onDone={() => { setMoveLoc(false); reload(); }} />}
       {del && (
         <Confirm title={`ลบ ${x.name}?`} danger confirmLabel="ลบรายการ" onClose={() => setDel(false)}
           message="รายการจะถูกซ่อนจากระบบ แต่ประวัติความเคลื่อนไหวยังถูกเก็บไว้"
           onConfirm={async () => { try { await api.del(`/api/consumables/${x.id}`); toast.success('ลบรายการแล้ว'); navigate('/assets'); } catch (e) { toast.error(e); throw e; } }} />
       )}
     </>
+  );
+}
+
+function LocationDialog({ item, onClose, onDone }) {
+  const toast = useToast();
+  const locs = useLookup('locations');
+  const [loc, setLoc] = useState(item.location_id || '');
+  const [busy, setBusy] = useState(false);
+  const save = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.put(`/api/consumables/${item.id}`, { location_id: loc || null });
+      toast.success('บันทึกสถานที่เก็บแล้ว');
+      onDone();
+    } catch (ex) { toast.error(ex); } finally { setBusy(false); }
+  };
+  return (
+    <Modal title={`เปลี่ยนสถานที่เก็บ · ${item.name}`} onClose={onClose} footer={(
+      <><button className="btn" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" type="submit" form="loc-form" disabled={busy || String(loc) === String(item.location_id || '')}>บันทึก</button></>
+    )}>
+      <form id="loc-form" onSubmit={save}>
+        <Field label="สถานที่เก็บ" hint={`ตอนนี้: ${item.location_name || 'ยังไม่ระบุ'} · การเปลี่ยนถูกบันทึกใน Audit log`}>
+          <Select value={loc} onChange={setLoc} placeholder="— ไม่ระบุ —"
+            options={locs.map((l) => ({ value: l.id, label: l.branch ? `${l.name} · ${l.branch}` : l.name }))} />
+        </Field>
+      </form>
+    </Modal>
   );
 }

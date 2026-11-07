@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Boxes, Eye, EyeOff, QrCode, ShieldCheck, History, AlertCircle } from 'lucide-react';
+import { Boxes, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../auth.jsx';
 import { Field } from '../components/ui.jsx';
 
@@ -32,25 +32,12 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-art">
-        <div className="row" style={{ gap: 10 }}>
-          <span className="brand-mark" style={{ background: 'var(--bg-surface)', color: 'var(--brand)' }}><Boxes size={18} /></span>
-          <span style={{ fontWeight: 600, fontSize: 18 }}>AssetFlow</span>
-        </div>
-        <div>
-          <h2>รู้ว่าอุปกรณ์ทุกชิ้นอยู่ที่ไหน อยู่กับใคร</h2>
-          <p>ทะเบียนทรัพย์สินไอที ยืม-คืน เบิกวัสดุสิ้นเปลือง และตรวจนับ ในที่เดียว</p>
-          <div className="feat">
-            <div><QrCode size={18} /> สแกน QR ด้วยมือถือเพื่อยืม-คืนได้ทันที</div>
-            <div><History size={18} /> ประวัติอุปกรณ์และ Audit Trail ครบทุกการเปลี่ยนแปลง</div>
-            <div><ShieldCheck size={18} /> สิทธิ์การใช้งานแยกตามบทบาท</div>
-          </div>
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>© {new Date().getFullYear()} AssetFlow · IT Asset Management</div>
-      </div>
-
       <div className="login-form-wrap">
         <form className="login-form" onSubmit={submit} noValidate>
+          <div className="login-brand">
+            <span className="brand-mark"><Boxes size={18} aria-hidden /></span>
+            <span className="brand-name">IT Store</span>
+          </div>
           <div>
             <h1 className="page-title">เข้าสู่ระบบ</h1>
             <p className="page-sub">ใช้บัญชีที่ได้รับจากผู้ดูแลระบบ</p>

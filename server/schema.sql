@@ -61,11 +61,8 @@ CREATE TABLE IF NOT EXISTS vendors (
 
 CREATE TABLE IF NOT EXISTS people (
   id            INTEGER PRIMARY KEY,
-  emp_code      TEXT,
   name          TEXT NOT NULL,
   department_id INTEGER REFERENCES departments(id),
-  email         TEXT,
-  phone         TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at    TEXT
 );
@@ -75,7 +72,6 @@ CREATE TABLE IF NOT EXISTS users (
   username        TEXT UNIQUE NOT NULL COLLATE NOCASE,
   password_hash   TEXT NOT NULL,
   full_name       TEXT NOT NULL,
-  email           TEXT,
   role_id         INTEGER NOT NULL REFERENCES roles(id),
   is_active       INTEGER NOT NULL DEFAULT 1,
   failed_attempts INTEGER NOT NULL DEFAULT 0,
@@ -108,7 +104,6 @@ CREATE TABLE IF NOT EXISTS assets (
                    CHECK (status IN ('available','borrowed','issued','repair','pending_disposal','scrapped')),
   location_id      INTEGER REFERENCES locations(id),
   holder_person_id INTEGER REFERENCES people(id),
-  holder_section   TEXT,
   department_id    INTEGER REFERENCES departments(id),
   due_date         TEXT,
   purchase_date    TEXT,
@@ -138,7 +133,6 @@ CREATE TABLE IF NOT EXISTS documents (
   department_id INTEGER REFERENCES departments(id),
   location_id   INTEGER REFERENCES locations(id),
   vendor_id     INTEGER REFERENCES vendors(id),
-  section       TEXT,
   po_number     TEXT,
   invoice_number TEXT,
   due_date      TEXT,
@@ -157,7 +151,6 @@ CREATE TABLE IF NOT EXISTS asset_transactions (
   person_id     INTEGER REFERENCES people(id),
   department_id INTEGER REFERENCES departments(id),
   location_id   INTEGER REFERENCES locations(id),
-  section       TEXT,
   due_date      TEXT,
   note          TEXT,
   evidence_path TEXT,
@@ -180,6 +173,7 @@ CREATE TABLE IF NOT EXISTS consumables (
   unit_cost     REAL,
   vendor_id     INTEGER REFERENCES vendors(id),
   notes         TEXT,
+  image_path    TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at    TEXT
@@ -193,7 +187,6 @@ CREATE TABLE IF NOT EXISTS stock_movements (
   balance_after  INTEGER NOT NULL,
   person_id      INTEGER REFERENCES people(id),
   department_id  INTEGER REFERENCES departments(id),
-  section        TEXT,
   unit_cost      REAL,
   received_date  TEXT,
   note           TEXT,
@@ -222,6 +215,89 @@ CREATE TABLE IF NOT EXISTS stock_count_scans (
   scanned_at  TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (count_id, raw_code)
 );
+
+-- รายการรอรับเข้า: lines uploaded from a file, received later into a normal RCV slip.
+-- The item is matched by SKU when listed, so creating a missing item makes its line ready.
+-- sku / qty are NULL on an incomplete line until someone fixes it on the page.
+CREATE TABLE IF NOT EXISTS pending_batches (
+  id          INTEGER PRIMARY KEY,
+  file_name   TEXT,
+  note        TEXT,
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS pending_receipts (
+  id          INTEGER PRIMARY KEY,
+  batch_id    INTEGER NOT NULL REFERENCES pending_batches(id),
+  line_no     INTEGER,
+  sku         TEXT,
+  name        TEXT,
+  qty         INTEGER CHECK (qty > 0),
+  unit_cost   REAL,
+  status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','received','cancelled')),
+  doc_id      INTEGER REFERENCES documents(id),
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  closed_by   INTEGER REFERENCES users(id),
+  closed_at   TEXT,
+  deleted_at  TEXT,
+  order_line_id INTEGER REFERENCES order_lines(id)
+);
+CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_receipts(status, batch_id);
+
+-- ใบสั่งซื้อ: a user picks registered items (any stock level) into a cart and orders them (pending). An admin
+-- approves (may lower quantities) or rejects. Approving puts every approved line into pending_receipts
+-- (order_line_id); the goods are received there as a normal RCV slip.
+-- A line is a consumable (consumable_id) or a group of per-unit assets with the same category/name/brand/model.
+-- delivered_* / doc_id are kept for orders delivered before receiving moved to รอรับเข้า; new orders don't use them.
+CREATE TABLE IF NOT EXISTS orders (
+  id            INTEGER PRIMARY KEY,
+  order_no      TEXT UNIQUE NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','delivered','rejected','cancelled')),
+  person_id     INTEGER REFERENCES people(id),
+  department_id INTEGER REFERENCES departments(id),
+  note          TEXT,
+  requested_by  INTEGER NOT NULL REFERENCES users(id),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  reviewed_by   INTEGER REFERENCES users(id),
+  reviewed_at   TEXT,
+  review_note   TEXT,
+  delivered_by  INTEGER REFERENCES users(id),
+  delivered_at  TEXT,
+  doc_id        INTEGER REFERENCES documents(id),
+  cancelled_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, id);
+CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(requested_by, id);
+
+CREATE TABLE IF NOT EXISTS order_lines (
+  id            INTEGER PRIMARY KEY,
+  order_id      INTEGER NOT NULL REFERENCES orders(id),
+  kind          TEXT NOT NULL CHECK (kind IN ('asset','consumable')),
+  consumable_id INTEGER REFERENCES consumables(id),
+  category_id   INTEGER REFERENCES categories(id),
+  name          TEXT NOT NULL,
+  brand         TEXT NOT NULL DEFAULT '',
+  model         TEXT NOT NULL DEFAULT '',
+  qty           INTEGER NOT NULL CHECK (qty > 0),
+  approved_qty  INTEGER CHECK (approved_qty >= 0),
+  unit_price    REAL
+);
+CREATE INDEX IF NOT EXISTS idx_order_lines ON order_lines(order_id);
+
+-- In-app notifications for one user (e.g. their purchase order was approved). Read state only; never edited otherwise.
+CREATE TABLE IF NOT EXISTS notifications (
+  id         INTEGER PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  kind       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  body       TEXT,
+  link       TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  read_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, id);
 
 CREATE TABLE IF NOT EXISTS access_logs (
   id         INTEGER PRIMARY KEY,

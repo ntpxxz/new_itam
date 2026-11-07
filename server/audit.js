@@ -12,16 +12,16 @@ function strip(obj) {
   return JSON.stringify(copy);
 }
 
-export function audit(req, entity, entityId, action, before, after) {
-  run(
+export async function audit(req, entity, entityId, action, before, after) {
+  await run(
     `INSERT INTO audit_logs (user_id, username, entity, entity_id, action, before_json, after_json, ip)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     req.user?.id, req.user?.username, entity, entityId, action, strip(before), strip(after), clientIp(req),
   );
 }
 
-export function accessLog(req, userId, username, event) {
-  run(
+export async function accessLog(req, userId, username, event) {
+  await run(
     'INSERT INTO access_logs (user_id, username, event, ip, user_agent) VALUES (?, ?, ?, ?, ?)',
     userId, username, event, clientIp(req), (req.headers['user-agent'] || '').slice(0, 300),
   );

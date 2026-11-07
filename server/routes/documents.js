@@ -1,19 +1,19 @@
 import { Router } from 'express';
-import { all, get, run, tx } from '../db.js';
+import { all, get, run, tx, localDate } from '../db.js';
 import { requirePerm, can } from '../auth.js';
 import { audit } from '../audit.js';
 import { HttpError, bad, notFound, paging, likeTerm, isDate, today, toInt } from './util.js';
 import { createAsset, applyAction } from './assets.js';
-import { moveStock } from './consumables.js';
+import { moveStock, createConsumable } from './consumables.js';
 import { resolveRecipient } from '../recipient.js';
 
 // Receive (ใบรับเข้า) and issue (ใบเบิก) slips. A slip holds many lines, mixing per-item assets and
 // quantity-tracked consumables; all lines are applied in one transaction (all or nothing).
 const r = Router();
 
-function nextDocNo(type, date) {
+async function nextDocNo(type, date) {
   const base = `${type === 'receive' ? 'RCV' : 'ISS'}-${date.slice(0, 4)}${date.slice(5, 7)}-`;
-  const row = get('SELECT doc_no FROM documents WHERE doc_no LIKE ? ORDER BY doc_no DESC LIMIT 1', base + '%');
+  const row = await get('SELECT doc_no FROM documents WHERE doc_no LIKE ? ORDER BY doc_no DESC LIMIT 1', base + '%');
   return base + String(row ? parseInt(row.doc_no.slice(base.length), 10) + 1 : 1).padStart(4, '0');
 }
 
@@ -26,8 +26,12 @@ function checkDocDate(d) {
 }
 
 /* ---------- receive ---------- */
-r.post('/receive', requirePerm('asset.create', 'consumable.move'), (req, res) => {
-  const b = req.body || {};
+r.post('/receive', requirePerm('asset.create', 'consumable.move'), async (req, res) => {
+  res.status(201).json(await createReceiveDoc(req, req.body || {}));
+});
+
+// Also used by รายการรอรับเข้า (pending.js), inside its own transaction.
+export async function createReceiveDoc(req, b) {
   const lines = Array.isArray(b.lines) ? b.lines : [];
   if (!lines.length) throw bad('กรุณาเพิ่มอย่างน้อย 1 รายการ');
   const doc_date = checkDocDate(b.doc_date);
@@ -35,18 +39,24 @@ r.post('/receive', requirePerm('asset.create', 'consumable.move'), (req, res) =>
   const location_id = toInt(b.location_id);
   const vendor_id = toInt(b.vendor_id);
 
-  const result = tx(() => {
-    const doc_no = nextDocNo('receive', doc_date);
-    const docId = Number(run(`INSERT INTO documents (doc_no, type, doc_date, location_id, vendor_id, po_number, invoice_number, note, created_by)
-      VALUES (?, 'receive', ?, ?, ?, ?, ?, ?, ?)`, doc_no, doc_date, location_id, vendor_id, b.po_number, b.invoice_number, b.note, req.user.id).lastInsertRowid);
+  return tx(async () => {
+    const doc_no = await nextDocNo('receive', doc_date);
+    const docId = Number((await run(`INSERT INTO documents (doc_no, type, doc_date, location_id, vendor_id, po_number, invoice_number, note, created_by)
+      VALUES (?, 'receive', ?, ?, ?, ?, ?, ?, ?)`, doc_no, doc_date, location_id, vendor_id, b.po_number, b.invoice_number, b.note, req.user.id)).lastInsertRowid);
     let assets = 0;
     let units = 0;
-    lines.forEach((l, i) => {
+    for (const [i, l] of lines.entries()) {
       try {
         if (l.kind === 'consumable') {
           if (!can(req.user, 'consumable.move')) throw new HttpError(403, 'คุณไม่มีสิทธิ์รับเข้าวัสดุสิ้นเปลือง');
           const note = [b.po_number && `PO ${b.po_number}`, l.note].filter(Boolean).join(' · ') || null;
-          moveStock(req, l.consumable_id, { type: 'in', qty: l.qty, unit_cost: l.unit_cost, received_date: doc_date, note }, docId);
+          let consumableId = l.consumable_id;
+          if (!consumableId) {
+            if (!can(req.user, 'consumable.manage')) throw new HttpError(403, 'คุณไม่มีสิทธิ์สร้างรายการนับจำนวนใหม่ — เลือกรายการที่มีอยู่แล้ว');
+            consumableId = await createConsumable(req, { sku: l.sku, category_id: l.category_id, name: l.name, unit: l.unit, reorder_point: l.reorder_point,
+              unit_cost: l.unit_cost, location_id, vendor_id });
+          }
+          await moveStock(req, consumableId, { type: 'in', qty: l.qty, unit_cost: l.unit_cost, received_date: doc_date, note }, docId);
           units += toInt(l.qty);
         } else if (l.kind === 'asset') {
           if (!can(req.user, 'asset.create')) throw new HttpError(403, 'คุณไม่มีสิทธิ์รับเข้าอุปกรณ์รายชิ้น');
@@ -56,7 +66,7 @@ r.post('/receive', requirePerm('asset.create', 'consumable.move'), (req, res) =>
           const filled = serials.filter(Boolean);
           if (new Set(filled).size !== filled.length) throw bad('Serial Number ซ้ำกันในรายการ');
           for (let k = 0; k < qty; k++) {
-            createAsset(req, {
+            await createAsset(req, {
               category_id: l.category_id, name: l.name, brand: l.brand, model: l.model, specs: l.specs, serial_no: serials[k] || null,
               purchase_price: l.unit_price, purchase_date: b.purchase_date || doc_date, warranty_expiry: l.warranty_expiry,
               po_number: b.po_number, invoice_number: b.invoice_number, vendor_id, location_id, department_id: l.department_id,
@@ -66,26 +76,29 @@ r.post('/receive', requirePerm('asset.create', 'consumable.move'), (req, res) =>
           }
         } else throw bad('ประเภทรายการไม่ถูกต้อง');
       } catch (e) { throw lineError(i, e); }
-    });
-    audit(req, 'document', docId, 'receive', null, { doc_no, lines: lines.length, assets, units });
+    }
+    await audit(req, 'document', docId, 'receive', null, { doc_no, lines: lines.length, assets, units });
     return { id: docId, doc_no, assets, units };
   });
-  res.status(201).json(result);
-});
+}
 
 // A backdated issue must not predate the asset's receipt or its latest movement.
-function checkNotBeforeHistory(assetId, docDate) {
-  const a = get('SELECT asset_tag, received_date FROM assets WHERE id = ?', assetId);
+async function checkNotBeforeHistory(assetId, docDate) {
+  const a = await get('SELECT asset_tag, received_date FROM assets WHERE id = ?', toInt(assetId));
   if (!a) return;
-  const last = get(`SELECT MAX(COALESCE(d.doc_date, date(t.created_at, 'localtime'))) AS d
-    FROM asset_transactions t LEFT JOIN documents d ON d.id = t.doc_id WHERE t.asset_id = ?`, assetId)?.d;
+  const last = (await get(`SELECT MAX(COALESCE(d.doc_date, ${localDate('t.created_at')})) AS d
+    FROM asset_transactions t LEFT JOIN documents d ON d.id = t.doc_id WHERE t.asset_id = ?`, toInt(assetId)))?.d;
   const floor = [a.received_date, last].filter(Boolean).sort().at(-1);
   if (floor && docDate < floor) throw bad(`${a.asset_tag}: วันที่เบิกต้องไม่ก่อน ${floor} (วันที่รับเข้า/รายการล่าสุดของอุปกรณ์)`);
 }
 
 /* ---------- issue ---------- */
-r.post('/issue', requirePerm('asset.transact', 'consumable.move'), (req, res) => {
-  const b = req.body || {};
+r.post('/issue', requirePerm('asset.transact', 'consumable.move'), async (req, res) => {
+  res.status(201).json(await createIssueDoc(req, req.body || {}));
+});
+
+// Also used by ใบสั่งซื้อ handover (orders.js), inside its own transaction.
+export async function createIssueDoc(req, b) {
   const lines = Array.isArray(b.lines) ? b.lines : [];
   if (!lines.length) throw bad('กรุณาเพิ่มอย่างน้อย 1 รายการ');
   const mode = b.mode === 'borrow' ? 'borrow' : 'issue';
@@ -96,36 +109,35 @@ r.post('/issue', requirePerm('asset.transact', 'consumable.move'), (req, res) =>
   if (new Set(ids).size !== ids.length) throw bad('มีอุปกรณ์ชิ้นเดียวกันซ้ำในใบเบิก');
   if (mode === 'borrow' && lines.some((l) => l.kind === 'consumable')) throw bad('รายการนับจำนวนเป็นของสิ้นเปลือง ยืมไม่ได้ — ใช้ประเภท “เบิกออก”');
 
-  const result = tx(() => {
-    const who = resolveRecipient(req, b);
+  return tx(async () => {
+    const who = await resolveRecipient(req, b);
     const { person_id, department_id } = who;
-    const doc_no = nextDocNo('issue', doc_date);
-    const docId = Number(run(`INSERT INTO documents (doc_no, type, doc_date, mode, person_id, department_id, location_id, due_date, note, created_by)
-      VALUES (?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?)`, doc_no, doc_date, mode, person_id, department_id, toInt(b.location_id), due_date, b.note, req.user.id).lastInsertRowid);
+    const doc_no = await nextDocNo('issue', doc_date);
+    const docId = Number((await run(`INSERT INTO documents (doc_no, type, doc_date, mode, person_id, department_id, location_id, due_date, note, created_by)
+      VALUES (?, 'issue', ?, ?, ?, ?, ?, ?, ?, ?)`, doc_no, doc_date, mode, person_id, department_id, toInt(b.location_id), due_date, b.note, req.user.id)).lastInsertRowid);
     let assets = 0;
     let units = 0;
-    lines.forEach((l, i) => {
+    for (const [i, l] of lines.entries()) {
       try {
         if (l.kind === 'consumable') {
           if (!can(req.user, 'consumable.move')) throw new HttpError(403, 'คุณไม่มีสิทธิ์เบิกวัสดุสิ้นเปลือง');
-          moveStock(req, l.consumable_id, { type: 'out', qty: l.qty, ...who, note: [doc_no, l.note || b.note].filter(Boolean).join(' · ') }, docId);
+          await moveStock(req, l.consumable_id, { type: 'out', qty: l.qty, ...who, note: [doc_no, l.note || b.note].filter(Boolean).join(' · ') }, docId);
           units += toInt(l.qty);
         } else if (l.kind === 'asset') {
-          checkNotBeforeHistory(l.asset_id, doc_date);
-          applyAction(req, l.asset_id, mode, { ...who, location_id: b.location_id, due_date, min_due: doc_date, note: [doc_no, l.note || b.note].filter(Boolean).join(' · ') }, docId);
+          await checkNotBeforeHistory(l.asset_id, doc_date);
+          await applyAction(req, l.asset_id, mode, { ...who, location_id: b.location_id, due_date, min_due: doc_date, note: [doc_no, l.note || b.note].filter(Boolean).join(' · ') }, docId);
           assets++;
         } else throw bad('ประเภทรายการไม่ถูกต้อง');
       } catch (e) { throw lineError(i, e); }
-    });
-    audit(req, 'document', docId, 'issue', null, { doc_no, mode, person_id, department_id, lines: lines.length, assets, units });
+    }
+    await audit(req, 'document', docId, 'issue', null, { doc_no, mode, person_id, department_id, lines: lines.length, assets, units });
     return { id: docId, doc_no, assets, units };
   });
-  res.status(201).json(result);
-});
+}
 
 /* ---------- read ---------- */
 const DOC_SELECT = `
-  SELECT d.*, p.name AS person_name, p.emp_code, dp.name AS department_name, l.name AS location_name, v.name AS vendor_name,
+  SELECT d.*, p.name AS person_name, dp.name AS department_name, l.name AS location_name, v.name AS vendor_name,
          u.full_name AS created_by_name,
          (SELECT COUNT(*) FROM asset_transactions t WHERE t.doc_id = d.id) AS asset_count,
          (SELECT COALESCE(SUM(ABS(m.qty)),0) FROM stock_movements m WHERE m.doc_id = d.id) AS unit_count,
@@ -136,24 +148,24 @@ const DOC_SELECT = `
   LEFT JOIN locations l ON l.id = d.location_id LEFT JOIN vendors v ON v.id = d.vendor_id
   LEFT JOIN users u ON u.id = d.created_by`;
 
-r.get('/', requirePerm('asset.view', 'consumable.view'), (req, res) => {
+r.get('/', requirePerm('asset.view', 'consumable.view'), async (req, res) => {
   const { page, pageSize, offset } = paging(req);
   const w = ['1=1']; const p = [];
   if (req.query.type) { w.push('d.type = ?'); p.push(req.query.type); }
   if (req.query.q) { w.push(`(d.doc_no LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR dp.name LIKE ? ESCAPE '\\' OR d.po_number LIKE ? ESCAPE '\\')`); p.push(likeTerm(req.query.q), likeTerm(req.query.q), likeTerm(req.query.q), likeTerm(req.query.q)); }
-  const total = get(`SELECT COUNT(*) n FROM documents d LEFT JOIN people p ON p.id = d.person_id LEFT JOIN departments dp ON dp.id = d.department_id WHERE ${w.join(' AND ')}`, ...p).n;
-  const rows = all(`${DOC_SELECT} WHERE ${w.join(' AND ')} ORDER BY d.id DESC LIMIT ? OFFSET ?`, ...p, pageSize, offset);
+  const total = (await get(`SELECT COUNT(*) n FROM documents d LEFT JOIN people p ON p.id = d.person_id LEFT JOIN departments dp ON dp.id = d.department_id WHERE ${w.join(' AND ')}`, ...p)).n;
+  const rows = await all(`${DOC_SELECT} WHERE ${w.join(' AND ')} ORDER BY d.id DESC LIMIT ? OFFSET ?`, ...p, pageSize, offset);
   res.json({ rows, total, page, pageSize });
 });
 
-r.get('/:id', requirePerm('asset.view', 'consumable.view'), (req, res) => {
-  const doc = get(`${DOC_SELECT} WHERE d.id = ?`, req.params.id);
+r.get('/:id', requirePerm('asset.view', 'consumable.view'), async (req, res) => {
+  const doc = await get(`${DOC_SELECT} WHERE d.id = ?`, toInt(req.params.id));
   if (!doc) throw notFound('เอกสาร');
   const lines = [
-    ...all(`SELECT 'asset' kind, t.id, a.id ref_id, a.asset_tag code, a.name, c.name category_name, a.serial_no, 1 qty, 'ชิ้น' unit,
+    ...await all(`SELECT 'asset' kind, t.id, a.id ref_id, a.asset_tag code, a.name, c.name category_name, a.serial_no, 1 qty, 'ชิ้น' unit,
               t.cost unit_price, t.action, t.due_date FROM asset_transactions t JOIN assets a ON a.id = t.asset_id
               JOIN categories c ON c.id = a.category_id WHERE t.doc_id = ? ORDER BY t.id`, doc.id),
-    ...all(`SELECT 'consumable' kind, m.id, x.id ref_id, x.sku code, x.name, c.name category_name, NULL serial_no, ABS(m.qty) qty, x.unit,
+    ...await all(`SELECT 'consumable' kind, m.id, x.id ref_id, x.sku code, x.name, c.name category_name, NULL serial_no, ABS(m.qty) qty, x.unit,
               m.unit_cost unit_price, m.type action, NULL due_date FROM stock_movements m JOIN consumables x ON x.id = m.consumable_id
               JOIN categories c ON c.id = x.category_id WHERE m.doc_id = ? ORDER BY m.id`, doc.id),
   ];

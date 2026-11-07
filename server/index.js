@@ -1,9 +1,10 @@
 import './env.js';
 import express from 'express';
+import './async-routes.js';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
-import { ROOT, UPLOAD_DIR } from './db.js';
+import { ROOT, UPLOAD_DIR, CLIENT } from './db.js';
 import { bootstrap, purgeOldLogs } from './bootstrap.js';
 import { sessionMiddleware, requireAuth, purgeExpiredSessions } from './auth.js';
 import authRoutes from './routes/auth.js';
@@ -16,14 +17,20 @@ import adminRoutes from './routes/admin.js';
 import stockCountRoutes from './routes/stockcount.js';
 import itemRoutes from './routes/items.js';
 import documentRoutes from './routes/documents.js';
+import pendingRoutes from './routes/pending.js';
+import orderRoutes from './routes/orders.js';
+import notificationRoutes from './routes/notifications.js';
 import reportRoutes from './routes/reports.js';
+import assistantRoutes from './routes/assistant.js';
 
 const PORT = Number(process.env.PORT || 3093);
 const PROD = process.argv.includes('--prod') || process.env.NODE_ENV === 'production';
 
-bootstrap();
-purgeOldLogs();
-setInterval(() => { purgeOldLogs(); purgeExpiredSessions(); }, 6 * 60 * 60 * 1000).unref();
+await bootstrap();
+await purgeOldLogs();
+setInterval(() => {
+  purgeOldLogs().then(purgeExpiredSessions).catch((e) => console.error('  maintenance failed:', e.message));
+}, 6 * 60 * 60 * 1000).unref();
 
 const app = express();
 const server = http.createServer(app);
@@ -57,7 +64,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/master', masterRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/pending-receipts', pendingRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/assistant', assistantRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/consumables', consumableRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -93,5 +104,5 @@ app.use((err, req, res, next) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  AssetFlow ITAM  ${PROD ? '(production)' : '(dev)'}  →  http://localhost:${PORT}\n`);
+  console.log(`\n  IT Store  ${PROD ? '(production)' : '(dev)'}  →  http://localhost:${PORT}   db: ${CLIENT}\n`);
 });
