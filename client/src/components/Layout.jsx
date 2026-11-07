@@ -62,6 +62,14 @@ const NAV = [
 export default function Layout() {
   const { user, can, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('navCollapsed') === '1'; } catch { return false; } });
+  const toggleNav = () => {
+    if (window.matchMedia('(max-width: 759px)').matches) { setOpen(true); return; }
+    setCollapsed((c) => {
+      try { localStorage.setItem('navCollapsed', c ? '0' : '1'); } catch { /* storage blocked */ }
+      return !c;
+    });
+  };
   const [badges, setBadges] = useState({ overdue: 0, lowStock: 0, pendingReceive: 0, pendingOrders: 0, notifications: 0 });
   const [q, setQ] = useState('');
   const cart = useCart();
@@ -97,7 +105,7 @@ export default function Layout() {
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
   return (
-    <div className={`shell${open ? ' nav-open' : ''}`}>
+    <div className={`shell${open ? ' nav-open' : ''}${collapsed ? ' nav-collapsed' : ''}`}>
       <aside className="sidebar" aria-label="เมนูหลัก">
         <Link to="/" className="brand" style={{ textDecoration: 'none', color: 'inherit' }}>
           <span className="brand-mark"><Boxes size={18} aria-hidden /></span>
@@ -143,7 +151,7 @@ export default function Layout() {
 
       <div className="main-col">
         <header className="topbar">
-          <button className="icon-btn hamburger" onClick={() => setOpen(true)} aria-label="เปิดเมนู" aria-expanded={open}>
+          <button className="icon-btn hamburger" onClick={toggleNav} aria-label="แสดง/ซ่อนเมนู" title="แสดง/ซ่อนเมนู">
             <MenuIcon size={18} />
           </button>
           {can('asset.view') || can('consumable.view') ? (
