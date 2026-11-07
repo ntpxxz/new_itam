@@ -72,6 +72,7 @@ r.get('/badges', requireAuth, async (req, res) => {
     pendingReceive: can(req.user, 'consumable.view') ? (await get(`SELECT COUNT(*) n FROM pending_receipts WHERE status = 'pending' AND deleted_at IS NULL`)).n : 0,
     // Purchase orders waiting for approval (approved lines are counted in pendingReceive).
     pendingOrders: can(req.user, 'order.manage') ? (await get(`SELECT COUNT(*) n FROM orders WHERE status = 'pending'`)).n : 0,
+    notifications: (await get('SELECT COUNT(*) n FROM notifications WHERE user_id = ? AND read_at IS NULL', req.user.id)).n,
   });
 });
 

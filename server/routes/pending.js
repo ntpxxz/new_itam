@@ -4,6 +4,7 @@ import { requirePerm } from '../auth.js';
 import { audit } from '../audit.js';
 import { bad, notFound, likeTerm, toInt, toNum } from './util.js';
 import { createReceiveDoc } from './documents.js';
+import { notify } from '../notify.js';
 
 // รายการรอรับเข้า: rows uploaded from a file wait here until someone receives them (now or later).
 // Uploading never touches stock; receiving creates a normal RCV slip via createReceiveDoc(), so stock,
@@ -163,6 +164,17 @@ r.post('/receive', requirePerm('consumable.move'), async (req, res) => {
     await run(`UPDATE pending_receipts SET status = 'received', doc_id = ?, closed_by = ?, closed_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
       doc.id, req.user.id, now(), ...ids);
     await audit(req, 'pending_receipt', null, 'receive', null, { ids, doc_no: doc.doc_no });
+    for (const orderId of new Set(rows.map((x) => x.order_id).filter(Boolean))) {
+      const o = await get(`SELECT o.id, o.order_no, o.requested_by,
+          (SELECT COUNT(*) FROM pending_receipts pr JOIN order_lines ol ON ol.id = pr.order_line_id
+           WHERE ol.order_id = o.id AND pr.status = 'pending' AND pr.deleted_at IS NULL) AS waiting
+        FROM orders o WHERE o.id = ?`, orderId);
+      const n = rows.filter((x) => x.order_id === orderId).length;
+      await notify(req, o.requested_by, {
+        kind: 'order.received', title: `ของตามใบสั่งซื้อ ${o.order_no} เข้าสต็อกแล้ว`, link: `/orders/${o.id}`,
+        body: o.waiting ? `รับเข้า ${n} รายการ · ยังรออีก ${o.waiting} รายการ` : `รับเข้าครบแล้ว · รอส่งมอบ`,
+      });
+    }
     return doc;
   });
   res.status(201).json(result);

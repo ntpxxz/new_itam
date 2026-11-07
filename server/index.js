@@ -19,6 +19,7 @@ import itemRoutes from './routes/items.js';
 import documentRoutes from './routes/documents.js';
 import pendingRoutes from './routes/pending.js';
 import orderRoutes from './routes/orders.js';
+import notificationRoutes from './routes/notifications.js';
 import reportRoutes from './routes/reports.js';
 import assistantRoutes from './routes/assistant.js';
 
@@ -65,6 +66,7 @@ app.use('/api/items', itemRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/pending-receipts', pendingRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/assets', assetRoutes);

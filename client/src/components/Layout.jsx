@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   LayoutDashboard, Laptop, ArrowLeftRight, History, PackagePlus, PackageMinus, BarChart3, ScanLine, Printer, ClipboardCheck, FileSpreadsheet,
-  Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, Search, Bell, LogOut, KeyRound, Boxes,
-  AlertTriangle, PackageX, ClipboardList, ShoppingCart, ReceiptText,
+  Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, Search, LogOut, KeyRound, Boxes,
+  ClipboardList, ShoppingCart, ReceiptText,
 } from 'lucide-react';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
 import { initials } from '../format.js';
 import { useCart } from '../cart.js';
+import NotificationBell from './NotificationBell.jsx';
 import { Menu } from './ui.jsx';
 import AssistantChat from './AssistantChat.jsx';
 
@@ -61,7 +62,7 @@ const NAV = [
 export default function Layout() {
   const { user, can, logout } = useAuth();
   const [open, setOpen] = useState(false);
-  const [badges, setBadges] = useState({ overdue: 0, lowStock: 0, pendingReceive: 0, pendingOrders: 0 });
+  const [badges, setBadges] = useState({ overdue: 0, lowStock: 0, pendingReceive: 0, pendingOrders: 0, notifications: 0 });
   const [q, setQ] = useState('');
   const cart = useCart();
   const searchRef = useRef(null);
@@ -69,9 +70,12 @@ export default function Layout() {
   const navigate = useNavigate();
 
   useEffect(() => { setOpen(false); }, [loc.pathname]);
+  const loadBadges = () => api.get('/api/dashboard/badges').then(setBadges).catch(() => {});
+  useEffect(() => { loadBadges(); }, [loc.pathname]);
   useEffect(() => {
-    api.get('/api/dashboard/badges').then(setBadges).catch(() => {});
-  }, [loc.pathname]);
+    const t = setInterval(() => { if (!document.hidden) loadBadges(); }, 60000);
+    return () => clearInterval(t);
+  }, []);
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); searchRef.current?.focus(); }
@@ -90,7 +94,6 @@ export default function Layout() {
     searchRef.current?.blur();
   };
 
-  const alertCount = badges.overdue + badges.lowStock;
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
   return (
@@ -159,16 +162,7 @@ export default function Layout() {
           {can('asset.view') && (
             <Link to="/scan" className="icon-btn" aria-label="สแกน QR" title="สแกน QR"><ScanLine size={18} /></Link>
           )}
-          <Menu
-            buttonClass="icon-btn"
-            label={alertCount ? `การแจ้งเตือน ${alertCount} รายการ` : 'การแจ้งเตือน'}
-            icon={<><Bell size={18} />{alertCount > 0 && <span className="dot" aria-hidden />}</>}
-            items={[
-              badges.overdue > 0 && { label: `เกินกำหนดคืน ${badges.overdue} รายการ`, to: '/loans?filter=overdue', icon: <AlertTriangle size={15} /> },
-              badges.lowStock > 0 && { label: `สต็อกต่ำ ${badges.lowStock} รายการ`, to: '/assets?status=low', icon: <PackageX size={15} /> },
-              !alertCount && { label: 'ไม่มีรายการที่ต้องดำเนินการ', onClick: () => {} },
-            ]}
-          />
+          <NotificationBell badges={badges} onChange={loadBadges} />
           <Menu
             label="บัญชีผู้ใช้"
             icon={<span className="avatar" style={{ width: 30, height: 30, fontSize: 12 }}>{initials(user.full_name)}</span>}

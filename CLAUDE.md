@@ -117,6 +117,11 @@ available ──transfer──▶ available (location/department move)
 - Users without `order.manage` see only their own orders. Sidebar badge `pendingOrders` = orders waiting for approval (managers); approved lines count in `pendingReceive`.
 - `db.js` turns `''` params into NULL, so `brand`/`model` (NOT NULL DEFAULT '') are written and matched with `COALESCE(?, '')`.
 
+### Notifications (การแจ้งเตือน) — `server/notify.js`, `server/routes/notifications.js`, `client/src/components/NotificationBell.jsx`
+- Table `notifications` (one row per user; only `read_at` ever changes). `notify(req, userId, { kind, title, body, link })` inside the writer's transaction; never notifies the user about their own action. In-app only, no external service.
+- Sent to the person who ordered: `order.approved` (incl. lowered qty + note), `order.rejected` (reason), `order.cancelled` (by a manager), `order.received` (from รอรับเข้า, partial or complete), `order.delivered` (ISS no.).
+- Topbar bell = work alerts (overdue, low stock) + the latest 20 notifications; count `badges.notifications` (unread). Badges refresh on navigation and every 60 s while the tab is visible. Clicking marks read and opens `link`; อ่านทั้งหมด marks all.
+
 ### Recipients: free text name + แผนก — `server/recipient.js`
 - Borrow / issue / transfer / stock-out take **typed** `person_name`, `department_name` (UI: `RecipientFields`, inputs with datalist suggestions — no dropdowns).
 - **Name is optional.** A recipient needs a name **or** a department (แผนก) — issuing to a department as a whole leaves `holder_person_id` NULL. Stock-out from the item page needs neither.
@@ -220,7 +225,7 @@ available ──transfer──▶ available (location/department move)
 ### Phase 4 — next, in priority order
 Prefer free / offline options (no paid APIs, intranet only).
 1. [x] **Hand over a received order** — `/orders/:id` → `/issue?order=` pre-filled → ISS slip, order `delivered`.
-2. [ ] **Requester notifications in-app** — bell in the topbar: order approved / rejected / received. Stored in a `notifications` table; no external service.
+2. [x] **Requester notifications in-app** — topbar bell: order approved / rejected / cancelled / received / delivered (`notifications` table).
 3. [ ] **Self-service borrow requests** — same cart + approval flow with mode `borrow` and a due date; approval runs `applyAction('borrow')` via `createIssueDoc`.
 4. [ ] **Overdue & warranty reminders** — daily job (like the PDPA purge) → in-app list first; optional email through the organisation's own SMTP. (LINE Notify was shut down in 2025; LINE would need the Messaging API.)
 5. [ ] **Repair cost per job** — cost, vendor, invoice on `repair_in`; total per asset on the detail page and in reports.

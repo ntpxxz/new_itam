@@ -5,6 +5,7 @@ import { audit } from '../audit.js';
 import { HttpError, bad, notFound, likeTerm, today, toInt } from './util.js';
 import { resolveRecipient } from '../recipient.js';
 import { createIssueDoc } from './documents.js';
+import { notify } from '../notify.js';
 
 // ใบสั่งซื้อ: cart → pending → (admin) approved or rejected. Approving moves the approved lines to รายการรอรับเข้า
 // (pending_receipts.order_line_id), where the goods are received as a normal RCV slip. Any registered item, any stock level.
@@ -170,6 +171,7 @@ r.post('/:id/cancel', ANY, async (req, res) => {
     }
     await run(`UPDATE orders SET status = 'cancelled', cancelled_at = ? WHERE id = ?`, now(), o.id);
     await audit(req, 'order', o.id, 'cancel', { status: o.status }, { status: 'cancelled', reason: req.body?.reason || null });
+    await notify(req, o.requested_by, { kind: 'order.cancelled', title: `ใบสั่งซื้อ ${o.order_no} ถูกยกเลิก`, body: `โดย ${req.user.full_name}`, link: `/orders/${o.id}` });
   });
   res.json({ ok: true });
 });
@@ -192,6 +194,7 @@ r.post('/:id/handover', requirePerm('order.manage'), async (req, res) => {
     const doc = await createIssueDoc(req, { ...b, mode: 'issue', note: b.note || `ส่งมอบตามใบสั่งซื้อ ${o.order_no}` });
     await run(`UPDATE orders SET status = 'delivered', delivered_by = ?, delivered_at = ?, doc_id = ? WHERE id = ?`, req.user.id, now(), doc.id, o.id);
     await audit(req, 'order', o.id, 'deliver', { status: 'approved' }, { status: 'delivered', doc_no: doc.doc_no });
+    await notify(req, o.requested_by, { kind: 'order.delivered', title: `ส่งมอบของตามใบสั่งซื้อ ${o.order_no} แล้ว`, body: `ใบเบิก ${doc.doc_no}`, link: `/orders/${o.id}` });
     return doc;
   });
   res.status(201).json(result);
@@ -205,11 +208,13 @@ r.post('/:id/approve', requirePerm('order.manage'), async (req, res) => {
     const lines = await all('SELECT * FROM order_lines WHERE order_id = ? ORDER BY id', o.id);
     const given = new Map((Array.isArray(req.body?.lines) ? req.body.lines : []).map((l) => [toInt(l.id), l.approved_qty]));
     let total = 0;
+    let asked = 0;
     for (const [i, l] of lines.entries()) {
       const q = given.has(l.id) ? Number(given.get(l.id)) : l.qty;
       if (!Number.isInteger(q) || q < 0 || q > l.qty) throw bad(`รายการที่ ${i + 1}: จำนวนอนุมัติต้องอยู่ระหว่าง 0–${l.qty}`);
       await run('UPDATE order_lines SET approved_qty = ? WHERE id = ?', q, l.id);
       total += q;
+      asked += l.qty;
     }
     if (!total) throw bad('ต้องอนุมัติอย่างน้อย 1 รายการ — ถ้าไม่อนุมัติทั้งหมด ให้กด “ไม่อนุมัติ”');
     await run(`UPDATE orders SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE id = ?`, req.user.id, now(), req.body?.review_note || null, o.id);
@@ -221,6 +226,10 @@ r.post('/:id/approve', requirePerm('order.manage'), async (req, res) => {
         batch, i + 1, l.sku || null, l.name, l.approved_qty, l.unit_price, req.user.id, l.id);
     }
     await audit(req, 'order', o.id, 'approve', { status: 'pending' }, { status: 'approved', units: total, pending_batch: batch });
+    await notify(req, o.requested_by, {
+      kind: 'order.approved', title: `อนุมัติใบสั่งซื้อ ${o.order_no} แล้ว`, link: `/orders/${o.id}`,
+      body: [total < asked ? `อนุมัติ ${total} จาก ${asked} หน่วย` : 'อนุมัติครบทุกรายการ', 'รอของเข้า', req.body?.review_note].filter(Boolean).join(' · '),
+    });
   });
   res.json({ ok: true });
 });
@@ -233,6 +242,7 @@ r.post('/:id/reject', requirePerm('order.manage'), async (req, res) => {
     if (o.status !== 'pending') throw bad('ไม่อนุมัติได้เฉพาะใบสั่งซื้อที่รอตรวจสอบ');
     await run(`UPDATE orders SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE id = ?`, req.user.id, now(), note, o.id);
     await audit(req, 'order', o.id, 'reject', { status: 'pending' }, { status: 'rejected', review_note: note });
+    await notify(req, o.requested_by, { kind: 'order.rejected', title: `ไม่อนุมัติใบสั่งซื้อ ${o.order_no}`, body: `เหตุผล: ${note}`, link: `/orders/${o.id}` });
   });
   res.json({ ok: true });
 });

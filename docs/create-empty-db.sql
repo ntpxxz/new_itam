@@ -139,6 +139,17 @@ CREATE TABLE locations (
   deleted_at TEXT
 );
 
+CREATE TABLE notifications (
+  id         INTEGER PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  kind       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  body       TEXT,
+  link       TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  read_at    TEXT
+);
+
 CREATE TABLE order_lines (
   id            INTEGER PRIMARY KEY,
   order_id      INTEGER NOT NULL REFERENCES orders(id),
@@ -310,6 +321,7 @@ CREATE INDEX idx_atx_doc ON asset_transactions(doc_id) WHERE doc_id IS NOT NULL;
 CREATE INDEX idx_audit_created ON audit_logs(created_at);
 CREATE INDEX idx_audit_entity ON audit_logs(entity, entity_id);
 CREATE INDEX idx_docs_type ON documents(type, doc_date);
+CREATE INDEX idx_notifications_user ON notifications(user_id, id);
 CREATE INDEX idx_order_lines ON order_lines(order_id);
 CREATE INDEX idx_orders_status ON orders(status, id);
 CREATE INDEX idx_orders_user ON orders(requested_by, id);

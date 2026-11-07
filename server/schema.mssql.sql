@@ -290,6 +290,18 @@ CREATE TABLE order_lines (
   unit_price    DECIMAL(14,2) NULL
 );
 
+IF OBJECT_ID(N'dbo.notifications', N'U') IS NULL
+CREATE TABLE notifications (
+  id         INT IDENTITY(1,1) PRIMARY KEY,
+  user_id    INT NOT NULL REFERENCES users(id),
+  kind       NVARCHAR(40) NOT NULL,
+  title      NVARCHAR(300) NOT NULL,
+  body       NVARCHAR(MAX) NULL,
+  link       NVARCHAR(300) NULL,
+  created_at DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
+  read_at    DATETIME2(0) NULL
+);
+
 IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NULL
 CREATE TABLE audit_logs (
   id          INT IDENTITY(1,1) PRIMARY KEY,
@@ -348,6 +360,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_pending_status') CREA
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_status') CREATE INDEX idx_orders_status ON orders(status, id);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_user') CREATE INDEX idx_orders_user ON orders(requested_by, id);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_order_lines') CREATE INDEX idx_order_lines ON order_lines(order_id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_notifications_user') CREATE INDEX idx_notifications_user ON notifications(user_id, id);
 GO
 
 -- Append-only logs and history (deleting log rows is allowed only past settings.log_retention_days).

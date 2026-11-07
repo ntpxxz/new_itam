@@ -286,6 +286,19 @@ CREATE TABLE IF NOT EXISTS order_lines (
 );
 CREATE INDEX IF NOT EXISTS idx_order_lines ON order_lines(order_id);
 
+-- In-app notifications for one user (e.g. their purchase order was approved). Read state only; never edited otherwise.
+CREATE TABLE IF NOT EXISTS notifications (
+  id         INTEGER PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  kind       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  body       TEXT,
+  link       TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  read_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, id);
+
 CREATE TABLE IF NOT EXISTS access_logs (
   id         INTEGER PRIMARY KEY,
   user_id    INTEGER,
