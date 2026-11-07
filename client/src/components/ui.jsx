@@ -173,26 +173,39 @@ export function Select({ value, onChange, options, placeholder = '— เลื�
 
 export function Menu({ label = 'การทำงานเพิ่มเติม', items, icon, buttonClass = 'icon-btn plain' }) {
   const [open, setOpen] = useState(false);
-  const [up, setUp] = useState(false);
+  const [pos, setPos] = useState(null);
   const ref = useRef(null);
   useEffect(() => {
     if (!open) return;
     const close = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
     const esc = (e) => e.key === 'Escape' && setOpen(false);
+    const hide = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const shut = () => setOpen(false);
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+    document.addEventListener('scroll', hide, true);
+    window.addEventListener('resize', shut);
+    return () => {
+      document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc);
+      document.removeEventListener('scroll', hide, true); window.removeEventListener('resize', shut);
+    };
   }, [open]);
   const visible = items.filter(Boolean);
   if (!visible.length) return null;
   return (
     <div className="menu-wrap" ref={ref} onClick={(e) => e.stopPropagation()}>
       <button className={buttonClass} aria-label={label} aria-haspopup="menu" aria-expanded={open}
-        onClick={(e) => { setUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 220); setOpen((o) => !o); }}>
+        onClick={(e) => {
+          // Fixed to the viewport so table scroll wrappers never clip it or grow a scrollbar.
+          const r = e.currentTarget.getBoundingClientRect();
+          const right = window.innerWidth - r.right;
+          setPos(window.innerHeight - r.bottom < 220 ? { right, bottom: window.innerHeight - r.top + 4 } : { right, top: r.bottom + 4 });
+          setOpen((o) => !o);
+        }}>
         {icon || <MoreHorizontal size={18} />}
       </button>
       {open && (
-        <div className={`menu${up ? ' up' : ''}`} role="menu">
+        <div className="menu fixed" style={pos} role="menu">
           {visible.map((it, i) => (it === '-' ? <hr key={i} /> : it.to ? (
             <Link key={i} to={it.to} role="menuitem" className={it.danger ? 'danger' : ''} onClick={() => setOpen(false)}>{it.icon}{it.label}</Link>
           ) : (

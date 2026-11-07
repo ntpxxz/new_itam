@@ -301,7 +301,7 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 50; min-width: 180px; background: var(--bg-surface);
   border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-pop); padding: 4px; text-align: left;
 }
-.menu.up { top: auto; bottom: calc(100% + 4px); }
+.menu.fixed { position: fixed; top: auto; z-index: 90; }
 .menu button, .menu a {
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: transparent;
   border-radius: var(--radius-sm); font-size: 13px; color: var(--text); cursor: pointer; text-decoration: none; white-space: nowrap;
