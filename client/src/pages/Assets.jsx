@@ -7,6 +7,7 @@ import { useApi, useLookup, useQueryState, useDebounced } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { api, download } from '../api.js';
 import { useToast } from '../components/Toast.jsx';
+import Photo from '../components/Photo.jsx';
 import {
   PageHeader, StatusChip, Pagination, Empty, Loading, Menu, Select, SortHeader, Confirm, CategorySelect, STATUS, KIND_LABEL,
 } from '../components/ui.jsx';
@@ -190,7 +191,7 @@ function AssetRow({ r, can, selected, onToggle, onOpen, onDelete }) {
       </td>
       <td>
         <div className="row" style={{ gap: 10 }}>
-          <span className="thumb">{r.image_path ? <img src={r.image_path} alt="" loading="lazy" /> : <Laptop size={16} />}</span>
+          <Photo src={r.image_path} alt={r.name} icon={Laptop} />
           <div style={{ minWidth: 0 }}>
             <Link to={`/assets/${r.id}`} className="cell-main" onClick={(e) => e.stopPropagation()}>{r.name}</Link>
             <div className="tag">{r.code}{r.serial_no && <span> · SN {r.serial_no}</span>}</div>
@@ -232,7 +233,7 @@ function StockRow({ r, can, onOpen, onMove, onDelete }) {
       <td />
       <td>
         <div className="row" style={{ gap: 10 }}>
-          <span className="thumb">{r.image_path ? <img src={r.image_path} alt="" loading="lazy" /> : <Package size={16} />}</span>
+          <Photo src={r.image_path} alt={r.name} icon={Package} />
           <div style={{ minWidth: 0 }}>
             <Link to={`/consumables/${r.id}`} className="cell-main" onClick={(e) => e.stopPropagation()}>{r.name}</Link>
             <div className="tag">{r.code}</div>

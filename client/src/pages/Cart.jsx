@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { useCart, setCart, setLineQty, clearCart, maxQty } from '../cart.js';
 import { useToast } from '../components/Toast.jsx';
+import Photo from '../components/Photo.jsx';
 import { PageHeader, Card, Field, Empty, Loading, Confirm } from '../components/ui.jsx';
 import RecipientFields from '../components/RecipientFields.jsx';
 import QtyStepper from '../components/QtyStepper.jsx';
@@ -87,7 +88,7 @@ export default function Cart() {
                         <tr key={key}>
                           <td>
                             <div className="row" style={{ gap: 10 }}>
-                              <span className="thumb">{x?.image_path ? <img src={x.image_path} alt="" loading="lazy" /> : <Icon size={16} />}</span>
+                              <Photo src={x?.image_path} alt={x?.name} icon={Icon} />
                               <div style={{ minWidth: 0 }}>
                                 <div className={x ? 'cell-main' : 'cell-main danger-text'}>{x?.name || 'สินค้านี้ไม่มีในระบบแล้ว'}</div>
                                 {x && <div className="cell-sub">{[x.category_name, x.brand, x.model].filter(Boolean).join(' · ')}{x.code && <> · <span className="mono">{x.code}</span></>}</div>}

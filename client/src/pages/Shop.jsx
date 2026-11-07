@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { useDebounced } from '../hooks.js';
 import { useCart, setCart, setLineQty, maxQty } from '../cart.js';
 import { useToast } from '../components/Toast.jsx';
+import Photo from '../components/Photo.jsx';
 import { PageHeader, Card, Empty, Loading, Chip } from '../components/ui.jsx';
 import QtyStepper from '../components/QtyStepper.jsx';
 import { fmtNum, fmtMoney } from '../format.js';
@@ -62,7 +63,7 @@ export default function Shop() {
                   const Icon = x.kind === 'asset' ? Laptop : Package;
                   return (
                     <div className="shop-item" key={x.key}>
-                      <div className="shop-photo">{x.image_path ? <img src={x.image_path} alt="" loading="lazy" /> : <Icon size={28} aria-hidden />}</div>
+                      <Photo src={x.image_path} alt={x.name} icon={Icon} iconSize={28} className="shop-photo" />
                       <div className="cell-main shop-name">{x.name}</div>
                       <div className="cell-sub">{[x.category_name, x.brand, x.model].filter(Boolean).join(' · ')}</div>
                       {x.code && <div className="tag">{x.code}</div>}

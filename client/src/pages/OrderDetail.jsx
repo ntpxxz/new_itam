@@ -5,6 +5,7 @@ import { useApi } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
 import { useToast } from '../components/Toast.jsx';
+import Photo from '../components/Photo.jsx';
 import { PageHeader, Card, Loading, Empty, Modal, Field, Confirm, Chip } from '../components/ui.jsx';
 import { OrderChip } from './Orders.jsx';
 import { fmtDateTime, fmtMoney, fmtNum } from '../format.js';
@@ -96,7 +97,7 @@ export default function OrderDetail() {
                     <tr key={l.id}>
                       <td>
                         <div className="row" style={{ gap: 10 }}>
-                          <span className="thumb">{l.image_path ? <img src={l.image_path} alt="" loading="lazy" /> : <Icon size={16} />}</span>
+                          <Photo src={l.image_path} alt={l.name} icon={Icon} />
                           <div style={{ minWidth: 0 }}>
                             <div className="cell-main">{l.name}</div>
                             <div className="cell-sub">{[l.category_name, l.brand, l.model].filter(Boolean).join(' · ')}{l.code && <> · <span className="mono">{l.code}</span></>}</div>

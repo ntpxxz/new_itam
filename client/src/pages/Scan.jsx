@@ -4,6 +4,7 @@ import { Keyboard, ArrowRight, Laptop } from 'lucide-react';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { useToast } from '../components/Toast.jsx';
+import Photo from '../components/Photo.jsx';
 import { PageHeader, Card, StatusChip } from '../components/ui.jsx';
 import QrScanner from '../components/QrScanner.jsx';
 import { who, isHeld } from '../format.js';
@@ -68,7 +69,7 @@ export default function Scan() {
           ) : (
             <div className="stack" style={{ gap: 12 }}>
               <div className="scan-result">
-                <span className="thumb" style={{ width: 48, height: 48 }}>{found.image_path ? <img src={found.image_path} alt="" /> : <Laptop size={20} />}</span>
+                <Photo src={found.image_path} alt={found.name} icon={Laptop} iconSize={20} style={{ width: 48, height: 48 }} lazy={false} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="cell-main">{found.name}</div>
                   <div className="tag">{found.asset_tag}</div>
