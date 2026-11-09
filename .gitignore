@@ -3,3 +3,5 @@ dist/
 data/
 *.log
 .env
+# exported Docker images (docker save) — too large for git
+deploy/**/*.tar.gz
