@@ -84,6 +84,15 @@ export default function Layout() {
     const t = setInterval(() => { if (!document.hidden) loadBadges(); }, 60000);
     return () => clearInterval(t);
   }, []);
+  // Scrolling over a focused number field would silently change it; let the page scroll instead.
+  useEffect(() => {
+    const onWheel = (e) => {
+      const el = document.activeElement;
+      if (el?.type === 'number' && el === e.target) el.blur();
+    };
+    document.addEventListener('wheel', onWheel, { passive: true });
+    return () => document.removeEventListener('wheel', onWheel);
+  }, []);
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); searchRef.current?.focus(); }

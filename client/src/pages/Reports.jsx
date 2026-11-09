@@ -135,11 +135,11 @@ export default function Reports() {
               </tbody>
               <tfoot>
                 <tr style={{ fontWeight: 600 }}>
-                  <td /><td style={{ padding: '12px 16px' }}>รวม</td>
-                  <td className="text-right mono" style={{ padding: '12px 16px' }}>{fmtNum(t.assets_issued)}</td>
-                  <td className="text-right mono" style={{ padding: '12px 16px' }}>{fmtNum(t.assets_borrowed)}</td>
-                  <td className="text-right mono" style={{ padding: '12px 16px' }}>{fmtNum(t.units)}</td>
-                  <td className="mono" style={{ padding: '12px 16px' }}>{fmtMoney(t.value)}</td>
+                  <td /><td>รวม</td>
+                  <td className="text-right mono">{fmtNum(t.assets_issued)}</td>
+                  <td className="text-right mono">{fmtNum(t.assets_borrowed)}</td>
+                  <td className="text-right mono">{fmtNum(t.units)}</td>
+                  <td className="mono">{fmtMoney(t.value)}</td>
                   <td colSpan={2} />
                 </tr>
               </tfoot>

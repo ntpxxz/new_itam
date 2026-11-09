@@ -52,7 +52,14 @@ export default function Receive() {
 
   const setH = (k) => (v) => setHead((h) => ({ ...h, [k]: v?.target ? v.target.value : v }));
   const update = (key, patch) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const remove = (key) => setLines((ls) => ls.filter((l) => l.key !== key));
+  const remove = (key) => {
+    const at = lines.findIndex((l) => l.key === key);
+    const line = lines[at];
+    setLines((ls) => ls.filter((l) => l.key !== key));
+    toast.undo(`ลบ “${line.item?.name || line.name || `รายการที่ ${at + 1}`}” ออกจากใบแล้ว`,
+      () => setLines((ls) => (line.kind === 'consumable' && ls.some((l) => l.kind === 'consumable' && l.item.id === line.item.id)
+        ? ls : [...ls.slice(0, at), line, ...ls.slice(at)])));
+  };
 
   const addConsumable = (row) => {
     setLines((ls) => {

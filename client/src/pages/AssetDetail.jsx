@@ -82,7 +82,7 @@ export default function AssetDetail() {
                   <Link to={`/assets?category_id=${a.category_id}`} className="chip chip-neutral no-dot" title="ดูอุปกรณ์ทั้งหมดในหมวดนี้">{a.category_name}</Link>
                 </div>
                 <div className="mono" style={{ fontSize: 16, fontWeight: 600 }}>{a.asset_tag}</div>
-                <div className="muted" style={{ fontSize: 13 }}>{[a.brand, a.model].filter(Boolean).join(' · ') || '—'}</div>
+                <div className="muted text-sm">{[a.brand, a.model].filter(Boolean).join(' · ') || '—'}</div>
                 {a.serial_no && <div className="tag">SN {a.serial_no}</div>}
               </div>
             </div>
@@ -91,10 +91,10 @@ export default function AssetDetail() {
           <div className="grid-2">
             <Card title="รายละเอียด">
               <dl className="dl">
-                <dt>สเปก</dt><dd style={{ whiteSpace: 'pre-line' }}>{a.specs || '—'}</dd>
+                <dt>สเปก</dt><dd className="pre-line">{a.specs || '—'}</dd>
                 <dt>สถานที่</dt><dd>{a.location_name ? `${a.location_name}${a.location_branch ? ` · ${a.location_branch}` : ''}` : '—'}</dd>
                 <dt>แผนก</dt><dd>{a.department_name || '—'}</dd>
-                <dt>หมายเหตุ</dt><dd style={{ whiteSpace: 'pre-line' }}>{a.notes || '—'}</dd>
+                <dt>หมายเหตุ</dt><dd className="pre-line">{a.notes || '—'}</dd>
                 <dt>แก้ไขล่าสุด</dt><dd>{fmtDateTime(a.updated_at)}</dd>
               </dl>
             </Card>
@@ -131,7 +131,7 @@ export default function AssetDetail() {
                       <span className={`node ${TONE_NODE[m.tone]}`} aria-hidden />
                       <div className="t-head">
                         <span className="t-title">{m.label}</span>
-                        {h.person_name && <span className="muted" style={{ fontSize: 13 }}>{['return', 'repair_in'].includes(h.action) ? 'จาก' : '→'} {h.person_name}</span>}
+                        {h.person_name && <span className="muted text-sm">{['return', 'repair_in'].includes(h.action) ? 'จาก' : '→'} {h.person_name}</span>}
                         <span className="t-meta">{h.doc_date && h.doc_date !== fmtISODate(h.created_at) ? <>วันที่ {fmtDate(h.doc_date)} · บันทึก {fmtDateTime(h.created_at)}</> : fmtDateTime(h.created_at)}</span>
                       </div>
                       <div className="t-body">
@@ -185,8 +185,8 @@ export default function AssetDetail() {
                   })}
                 </div>
               )}
-              {a.status === 'scrapped' && <p className="muted" style={{ fontSize: 13 }}>อุปกรณ์ที่ Scrap แล้วทำรายการเพิ่มไม่ได้ ข้อมูลเก็บไว้เพื่อการตรวจสอบ</p>}
-              {!allowedActions.length && a.status !== 'scrapped' && <p className="muted" style={{ fontSize: 13 }}><User size={13} /> บัญชีของคุณดูข้อมูลได้อย่างเดียว</p>}
+              {a.status === 'scrapped' && <p className="muted text-sm">อุปกรณ์ที่ Scrap แล้วทำรายการเพิ่มไม่ได้ ข้อมูลเก็บไว้เพื่อการตรวจสอบ</p>}
+              {!allowedActions.length && a.status !== 'scrapped' && <p className="muted text-sm"><User size={13} /> บัญชีของคุณดูข้อมูลได้อย่างเดียว</p>}
             </div>
           </Card>
 

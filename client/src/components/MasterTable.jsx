@@ -72,7 +72,7 @@ export default function MasterTable({ table, title, columns, addLabel = 'เพ�
     )}>
       {checks && selected.size > 0 && (
         <div className="toolbar" style={{ paddingTop: 10, paddingBottom: 10 }}>
-          <span className="muted" style={{ fontSize: 13 }}>เลือก <span className="mono">{selected.size}</span> รายการ</span>
+          <span className="muted text-sm">เลือก <span className="mono">{selected.size}</span> รายการ</span>
           <span className="spacer" />
           {bulkSet && <button className="btn btn-sm" onClick={() => setBulk('set')}><ArrowRightLeft size={14} />เปลี่ยน{bulkSet.label}</button>}
           <button className="btn btn-sm btn-danger" onClick={() => setBulk('delete')}><Trash2 size={14} />ลบที่เลือก</button>

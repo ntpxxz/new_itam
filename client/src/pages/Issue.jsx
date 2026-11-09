@@ -75,7 +75,12 @@ export default function Issue() {
     });
   };
   const setQty = (key, q) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, qty: Math.max(1, Math.min(l.item.qty_on_hand, q || 1)) } : l)));
-  const remove = (key) => setLines((ls) => ls.filter((l) => l.key !== key));
+  const remove = (key) => {
+    const at = lines.findIndex((l) => l.key === key);
+    const line = lines[at];
+    setLines((ls) => ls.filter((l) => l.key !== key));
+    toast.undo(`ลบ “${line.item.name}” ออกจากใบแล้ว`, () => setLines((ls) => (ls.some((l) => l.item.kind === line.item.kind && l.item.id === line.item.id) ? ls : [...ls.slice(0, at), line, ...ls.slice(at)])));
+  };
 
   const assetLines = lines.filter((l) => l.item.kind === 'asset');
   const borrowBlocked = head.mode === 'borrow' && lines.some((l) => l.item.kind === 'consumable');

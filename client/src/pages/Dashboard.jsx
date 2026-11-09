@@ -32,7 +32,7 @@ function SpendChart({ data }) {
   const max = Math.max(1, ...data.map((d) => d.assets + d.consumables));
   const total = data.reduce((a, d) => a + d.assets + d.consumables, 0);
   return (
-    <Card title="ค่าใช้จ่ายซื้อเข้ารายเดือน" actions={<span className="mono muted" style={{ fontSize: 13 }}>รวม 6 เดือน {fmtMoney(total)}</span>}>
+    <Card title="ค่าใช้จ่ายซื้อเข้ารายเดือน" actions={<span className="mono muted text-sm">รวม 6 เดือน {fmtMoney(total)}</span>}>
       <div className="bars" role="img" aria-label="กราฟค่าใช้จ่ายซื้อเข้า 6 เดือนล่าสุด">
         {data.map((d) => {
           const sum = d.assets + d.consumables;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Plus, Search, Download, Upload, Laptop, Package, Eye, Pencil, Printer, Trash2, X, ShieldAlert, PackageMinus, PackagePlus,
+  Plus, Search, Download, Upload, Laptop, Package, Eye, Pencil, Printer, Trash2, X, ShieldAlert, PackageMinus, PackagePlus, Bookmark,
 } from 'lucide-react';
 import { useApi, useLookup, useQueryState, useDebounced } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
@@ -9,7 +9,7 @@ import { api, download } from '../api.js';
 import { useToast } from '../components/Toast.jsx';
 import Photo from '../components/Photo.jsx';
 import {
-  PageHeader, StatusChip, Pagination, Empty, Loading, Menu, Select, SortHeader, Confirm, CategorySelect, STATUS, KIND_LABEL,
+  PageHeader, StatusChip, Pagination, Empty, Loading, Menu, Select, SortHeader, Confirm, CategorySelect, STATUS, KIND_LABEL, Modal, Field,
 } from '../components/ui.jsx';
 import { MoveDialog } from '../components/ConsumableDialogs.jsx';
 import { fmtDate, daysFromToday, fmtMoney, fmtNum, who, isHeld } from '../format.js';
@@ -25,7 +25,7 @@ const FILTERS = [
 const detailUrl = (r) => (r.kind === 'asset' ? `/assets/${r.id}` : `/consumables/${r.id}`);
 
 export default function Assets() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [f, setF] = useQueryState({ q: '', kind: '', status: '', category_id: '', location_id: '', page: 1, sort: 'updated_at', dir: 'desc', warranty: '' });
@@ -113,10 +113,11 @@ export default function Assets() {
             ))}
           </div>
           {f.warranty === '1' && <span className="chip chip-warning"><ShieldAlert size={12} />ประกันใกล้หมด</span>}
+          <SavedViews userId={user.id} filtered={!!filtered} cats={cats} locs={locs} f={f} />
           <span className="spacer" />
           {selected.size > 0 && (
             <div className="row">
-              <span className="muted" style={{ fontSize: 13 }}>เลือก <span className="mono">{selected.size}</span> รายการ</span>
+              <span className="muted text-sm">เลือก <span className="mono">{selected.size}</span> รายการ</span>
               {can('label.print') && <button className="btn btn-sm" onClick={() => navigate(`/labels?ids=${[...selected].join(',')}`)}><Printer size={14} />พิมพ์สติ๊กเกอร์</button>}
               <button className="btn btn-sm btn-ghost" onClick={() => setSelected(new Set())}>ยกเลิกเลือก</button>
             </div>
@@ -168,6 +169,54 @@ export default function Assets() {
           onConfirm={() => remove(confirmDel)} onClose={() => setConfirmDel(null)} />
       )}
     </>
+  );
+}
+
+// Saved filter sets for this list, kept per user in this browser (a convenience, not shared).
+const viewsKey = (userId) => `views:assets:${userId}`;
+const loadViews = (userId) => { try { return JSON.parse(localStorage.getItem(viewsKey(userId))) || []; } catch { return []; } };
+const viewQuery = (search) => { const sp = new URLSearchParams(search); sp.delete('page'); sp.sort(); return sp.toString(); };
+
+function SavedViews({ userId, filtered, cats, locs, f }) {
+  const loc = useLocation();
+  const navigate = useNavigate();
+  const [views, setViews] = useState(() => loadViews(userId));
+  const [naming, setNaming] = useState(null);
+  const current = viewQuery(loc.search);
+  const store = (next) => { setViews(next); try { localStorage.setItem(viewsKey(userId), JSON.stringify(next)); } catch { /* storage blocked */ } };
+  const suggest = () => [
+    f.q && `“${f.q}”`, KINDS.find(([k]) => k && k === f.kind)?.[1], cats.find((c) => String(c.id) === String(f.category_id))?.name,
+    locs.find((l) => String(l.id) === String(f.location_id))?.name, f.status && (f.status === 'low' ? 'สต็อกต่ำ' : STATUS[f.status]),
+    f.warranty === '1' && 'ประกันใกล้หมด',
+  ].filter(Boolean).join(' · ') || 'มุมมองของฉัน';
+  const saved = views.some((v) => v.query === current);
+  if (!views.length && !filtered) return null;
+  return (
+    <div className="row-wrap" style={{ gap: 6 }}>
+      {views.map((v) => (
+        <span key={v.query} className={`view-chip${v.query === current ? ' on' : ''}`}>
+          <button type="button" onClick={() => navigate(`/assets${v.query ? `?${v.query}` : ''}`)} aria-pressed={v.query === current}>
+            <Bookmark size={12} aria-hidden />{v.name}
+          </button>
+          <button type="button" className="x" onClick={() => store(views.filter((x) => x !== v))} aria-label={`ลบมุมมอง ${v.name}`}><X size={12} /></button>
+        </span>
+      ))}
+      {filtered && !saved && (
+        <button type="button" className="btn btn-sm btn-ghost" onClick={() => setNaming(suggest())}><Bookmark size={14} />บันทึกตัวกรองนี้</button>
+      )}
+      {naming !== null && (
+        <Modal title="บันทึกตัวกรองนี้" onClose={() => setNaming(null)} footer={<>
+          <button className="btn" onClick={() => setNaming(null)}>ยกเลิก</button>
+          <button className="btn btn-primary" disabled={!naming.trim()}
+            onClick={() => { store([...views, { name: naming.trim().slice(0, 40), query: current }]); setNaming(null); }}>บันทึก</button>
+        </>}>
+          <Field label="ชื่อมุมมอง" hint="กดชื่อนี้ที่หน้าอุปกรณ์เพื่อกลับมาที่ตัวกรองชุดนี้ · เก็บไว้ในเบราว์เซอร์นี้เท่านั้น">
+            <input className="input" value={naming} maxLength={40} onChange={(e) => setNaming(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && naming.trim()) { store([...views, { name: naming.trim(), query: current }]); setNaming(null); } }} />
+          </Field>
+        </Modal>
+      )}
+    </div>
   );
 }
 

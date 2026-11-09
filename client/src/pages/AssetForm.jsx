@@ -258,7 +258,7 @@ export default function AssetForm() {
           )}
           {!kind && (
             <Card>
-              <div className="empty" style={{ padding: 24 }}><Package size={28} /><div style={{ fontSize: 13 }}>ช่องข้อมูลจะปรากฏหลังเลือกหมวดหมู่</div></div>
+              <div className="empty" style={{ padding: 24 }}><Package size={28} /><div className="text-sm">ช่องข้อมูลจะปรากฏหลังเลือกหมวดหมู่</div></div>
             </Card>
           )}
         </div>

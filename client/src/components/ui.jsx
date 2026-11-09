@@ -287,7 +287,7 @@ export function Empty({ icon: Icon = Inbox, title = 'ไม่มีข้อม
     <div className="empty">
       <Icon size={32} aria-hidden />
       <div className="t">{title}</div>
-      {children && <div style={{ fontSize: 13 }}>{children}</div>}
+      {children && <div className="text-sm">{children}</div>}
     </div>
   );
 }

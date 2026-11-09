@@ -45,7 +45,7 @@ export default function QrScanner({ onResult, paused }) {
     }[error];
     return (
       <div className="scan-box" style={{ display: 'grid', placeItems: 'center', background: 'var(--bg-subtle)', border: '1px dashed var(--border-strong)', aspectRatio: 'auto', minHeight: 180 }}>
-        <div className="empty" style={{ padding: 20 }}><CameraOff size={28} /><div style={{ fontSize: 13 }}>{msg}</div></div>
+        <div className="empty" style={{ padding: 20 }}><CameraOff size={28} /><div className="text-sm">{msg}</div></div>
       </div>
     );
   }

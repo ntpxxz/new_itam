@@ -76,7 +76,7 @@ export default function Scan() {
                   <div style={{ marginTop: 4 }}><StatusChip status={found.status} /></div>
                 </div>
               </div>
-              {(found.holder_name || (isHeld(found) && found.department_name)) && <div className="muted" style={{ fontSize: 13 }}>ถือครองโดย <strong style={{ color: 'var(--text)', fontWeight: 500 }}>{who(found.holder_name, found.department_name)}</strong>{found.holder_name && found.department_name && ` · ${found.department_name}`}</div>}
+              {(found.holder_name || (isHeld(found) && found.department_name)) && <div className="muted text-sm">ถือครองโดย <strong style={{ color: 'var(--text)', fontWeight: 500 }}>{who(found.holder_name, found.department_name)}</strong>{found.holder_name && found.department_name && ` · ${found.department_name}`}</div>}
               <div className="action-grid">
                 {can('asset.transact') && (QUICK[found.status] || []).map((k) => (
                   <button key={k} className="btn btn-lg" onClick={() => navigate(`/assets/${found.id}?action=${k}`)}>{LABEL[k]}</button>
