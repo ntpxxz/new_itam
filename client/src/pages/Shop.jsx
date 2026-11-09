@@ -6,9 +6,11 @@ import { useDebounced } from '../hooks.js';
 import { useCart, setCart, setLineQty, maxQty } from '../cart.js';
 import { useToast } from '../components/Toast.jsx';
 import Photo from '../components/Photo.jsx';
-import { PageHeader, Card, Empty, Loading, Chip } from '../components/ui.jsx';
+import { PageHeader, Card, Empty, Loading, Chip, Pagination } from '../components/ui.jsx';
 import QtyStepper from '../components/QtyStepper.jsx';
 import { fmtNum, fmtMoney } from '../format.js';
+
+const PAGE_SIZE = 24;
 
 // สั่งซื้อสินค้า: pick any registered item into the cart (stock level doesn't matter); checkout happens on /cart.
 export default function Shop() {
@@ -17,6 +19,7 @@ export default function Shop() {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
   const [items, setItems] = useState(null);
+  const [page, setPage] = useState(1);
   const term = useDebounced(q);
 
   useEffect(() => {
@@ -30,6 +33,9 @@ export default function Shop() {
     return (items || []).filter((x) => (!cat || x.category_name === cat)
       && (!t || [x.name, x.code, x.brand, x.model].some((v) => v && v.toLowerCase().includes(t))));
   }, [items, term, cat]);
+  useEffect(() => { setPage(1); }, [term, cat]);
+  const pageRows = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const goPage = (p) => { setPage(p); window.scrollTo({ top: 0 }); };
 
   const inCart = (key) => cart.find((l) => l.key === key)?.qty || 0;
   const units = cart.reduce((s, l) => s + l.qty, 0);
@@ -56,7 +62,7 @@ export default function Shop() {
               </Empty>
             ) : (
               <div className="shop-grid">
-                {shown.map((x) => {
+                {pageRows.map((x) => {
                   const n = inCart(x.key);
                   const Icon = x.kind === 'asset' ? Laptop : Package;
                   return (
@@ -80,6 +86,7 @@ export default function Shop() {
               </div>
             )}
           </div>
+          {shown.length > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} total={shown.length} onPage={goPage} />}
         </Card>
 
         <div className="shop-cart">
