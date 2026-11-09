@@ -53,7 +53,14 @@ export function Chip({ tone = 'neutral', children, dot = true }) {
   return <span className={`chip chip-${tone}${dot ? '' : ' no-dot'}`}>{children}</span>;
 }
 
+const BASE_TITLE = 'IT Store';
+
 export function PageHeader({ title, sub, crumbs, children }) {
+  useEffect(() => {
+    if (typeof title !== 'string' || !title) return undefined;
+    document.title = `${title} · ${BASE_TITLE}`;
+    return () => { document.title = BASE_TITLE; };
+  }, [title]);
   return (
     <div className="page-head">
       <div className="titles">
@@ -148,14 +155,21 @@ export function Confirm({ title, message, confirmLabel = 'ยืนยัน', d
   );
 }
 
-export function Field({ label, required, hint, error, children, className = '' }) {
-  const id = useId();
-  const child = isValidElement(children)
-    ? cloneElement(children, { id: children.props.id || id, 'aria-invalid': error ? 'true' : undefined })
+const FORM_TAGS = ['input', 'select', 'textarea'];
+
+// The label points at the child control. When the child is a layout wrapper (div, span…), pass `htmlFor`
+// and put that id on the real input inside it.
+export function Field({ label, required, hint, error, children, className = '', htmlFor }) {
+  const autoId = useId();
+  const wrapper = isValidElement(children) && typeof children.type === 'string' && !FORM_TAGS.includes(children.type);
+  const id = htmlFor || (isValidElement(children) && children.props.id) || autoId;
+  const child = isValidElement(children) && !wrapper
+    ? cloneElement(children, { id, 'aria-invalid': error ? 'true' : undefined })
     : children;
+  const target = wrapper ? htmlFor : id;
   return (
     <div className={`field ${className}`}>
-      {label && <label htmlFor={id}>{label}{required && <span className="req" aria-hidden>*</span>}</label>}
+      {label && <label htmlFor={target}>{label}{required && <span className="req" aria-hidden>*</span>}</label>}
       {child}
       {error ? <span className="field-error">{error}</span> : hint && <span className="field-hint">{hint}</span>}
     </div>

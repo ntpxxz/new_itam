@@ -54,10 +54,10 @@ export function MoveDialog({ item, type, onClose, onDone }) {
             </div>
           </div>
         </div>
-        <Field label={type === 'adjust' ? 'ยอดคงเหลือจริง (จากการตรวจนับ)' : `จำนวน (${item.unit})`} required error={err.qty}>
+        <Field label={type === 'adjust' ? 'ยอดคงเหลือจริง (จากการตรวจนับ)' : `จำนวน (${item.unit})`} required error={err.qty} htmlFor="move-qty">
           <div className="row">
             {type !== 'adjust' && <button type="button" className="icon-btn" aria-label="ลดจำนวน" onClick={() => set('qty')(String(Math.max(1, qty - 1)))}>−</button>}
-            <input type="number" inputMode="numeric" min={type === 'adjust' ? 0 : 1} className="input mono" style={{ textAlign: 'center', maxWidth: 140 }}
+            <input id="move-qty" aria-invalid={err.qty ? 'true' : undefined} type="number" inputMode="numeric" min={type === 'adjust' ? 0 : 1} className="input mono" style={{ textAlign: 'center', maxWidth: 140 }}
               value={v.qty} onChange={set('qty')} />
             {type !== 'adjust' && <button type="button" className="icon-btn" aria-label="เพิ่มจำนวน" onClick={() => set('qty')(String(qty + 1))}>+</button>}
           </div>

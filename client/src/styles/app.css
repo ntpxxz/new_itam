@@ -331,7 +331,7 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
 
 /* ---------- Toast ---------- */
-.toasts { position: fixed; top: calc(var(--topbar-h) + 8px); left: 16px; right: 16px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+.toasts { position: fixed; top: calc(var(--topbar-h) + 8px); right: 16px; width: min(420px, calc(100vw - 32px)); z-index: 200; display: flex; flex-direction: column; gap: 8px; }
 .toast {
   display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 500;
   background: var(--success-soft); color: var(--text); border: 1px solid var(--success); border-left-width: 6px;

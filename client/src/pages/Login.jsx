@@ -49,9 +49,9 @@ export default function Login() {
             <input className="input" autoComplete="username" autoCapitalize="none" value={username}
               onChange={(e) => setUsername(e.target.value)} autoFocus required />
           </Field>
-          <Field label="รหัสผ่าน">
+          <Field label="รหัสผ่าน" htmlFor="login-password">
             <div style={{ position: 'relative' }}>
-              <input className="input" type={show ? 'text' : 'password'} autoComplete="current-password" value={password}
+              <input id="login-password" className="input" type={show ? 'text' : 'password'} autoComplete="current-password" value={password}
                 onChange={(e) => setPassword(e.target.value)} required style={{ paddingRight: 44 }} />
               <button type="button" className="icon-btn plain" onClick={() => setShow((s) => !s)}
                 aria-label={show ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} style={{ position: 'absolute', right: 2, top: 1 }}>

@@ -14,7 +14,7 @@ import { Menu } from './ui.jsx';
 import AssistantChat from './AssistantChat.jsx';
 
 const NAV = [
-  { label: 'ภาพรวม', items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, perm: 'dashboard.view', end: true }] },
+  { label: 'หน้าหลัก', items: [{ to: '/', label: 'ภาพรวม', icon: LayoutDashboard, perm: 'dashboard.view', end: true }] },
   {
     label: 'ทรัพย์สิน',
     items: [

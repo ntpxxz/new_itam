@@ -9,8 +9,10 @@ export function ToastProvider({ children }) {
   const dismiss = useCallback((id) => setItems((xs) => xs.filter((t) => t.id !== id)), []);
   const push = useCallback((type, message, ms) => {
     const id = nextId++;
-    setItems((xs) => [...xs.slice(-3), { id, type, message }]);
-    setTimeout(() => dismiss(id), ms ?? (type === 'error' ? 7000 : 3500));
+    // A repeated message replaces itself; a success clears earlier errors (the problem was fixed).
+    setItems((xs) => [...xs.filter((t) => !(t.type === type && t.message === message) && !(type === 'success' && t.type === 'error')).slice(-3), { id, type, message }]);
+    // Errors stay until closed so a long Thai message can be read in full.
+    if (type !== 'error') setTimeout(() => dismiss(id), ms ?? 3500);
   }, [dismiss]);
 
   const api = useMemo(() => ({
@@ -30,7 +32,7 @@ export function ToastProvider({ children }) {
             <div key={t.id} className={`toast ${t.type}`} role={t.type === 'error' ? 'alert' : undefined}>
               <I size={20} aria-hidden />
               <div>{t.message}</div>
-              <button className="icon-btn plain close" style={{ width: 24, height: 24 }} onClick={() => dismiss(t.id)} aria-label="ปิดข้อความ">
+              <button className="icon-btn plain close" style={{ width: 32, height: 32 }} onClick={() => dismiss(t.id)} aria-label="ปิดข้อความ">
                 <X size={14} />
               </button>
             </div>

@@ -161,8 +161,7 @@ export default function Issue() {
                 <div className="stack" style={{ gap: 2, alignItems: 'flex-end' }}>
                   <div className="row" style={{ gap: 4 }}>
                     <button className="icon-btn" onClick={() => setQty(l.key, l.qty - 1)} aria-label="ลดจำนวน" disabled={l.qty <= 1}><Minus size={14} /></button>
-                    <input type="number" min="1" max={l.item.qty_on_hand} className="input mono" style={{ width: 72, textAlign: 'center' }}
-                      value={l.qty} onChange={(e) => setQty(l.key, parseInt(e.target.value, 10))} aria-label={`จำนวน ${l.item.name}`} />
+                    <QtyInput value={l.qty} max={l.item.qty_on_hand} onChange={(q) => setQty(l.key, q)} label={`จำนวน ${l.item.name}`} />
                     <button className="icon-btn" onClick={() => setQty(l.key, l.qty + 1)} aria-label="เพิ่มจำนวน" disabled={l.qty >= l.item.qty_on_hand}><Plus size={14} /></button>
                     <span className="muted" style={{ fontSize: 13, minWidth: 32 }}>{l.item.unit}</span>
                   </div>
@@ -183,5 +182,17 @@ export default function Issue() {
 
       <DocList type="issue" title="ใบเบิกล่าสุด" />
     </>
+  );
+}
+
+// The field may be empty while typing; only numbers ≥ 1 are applied, blur shows the applied value again.
+function QtyInput({ value, max, onChange, label }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+  return (
+    <input type="number" min="1" max={max} inputMode="numeric" className="input mono" style={{ width: 72, textAlign: 'center' }}
+      value={draft} aria-label={label}
+      onChange={(e) => { setDraft(e.target.value); const n = parseInt(e.target.value, 10); if (n > 0) onChange(n); }}
+      onBlur={() => setDraft(String(value))} />
   );
 }

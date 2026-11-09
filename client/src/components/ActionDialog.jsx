@@ -116,9 +116,9 @@ export default function ActionDialog({ asset, action, onClose, onDone }) {
           </div>
         )}
         {showDue && (
-          <Field label="กำหนดคืน" required={needs.includes('due_date')} error={err.due_date}>
+          <Field label="กำหนดคืน" required={needs.includes('due_date')} error={err.due_date} htmlFor="action-due">
             <div className="row-wrap">
-              <input type="date" className="input" style={{ maxWidth: 200 }} min={todayISO()} value={v.due_date} onChange={set('due_date')} />
+              <input id="action-due" aria-invalid={err.due_date ? 'true' : undefined} type="date" className="input" style={{ maxWidth: 200 }} min={todayISO()} value={v.due_date} onChange={set('due_date')} />
               {[3, 7, 14, 30].map((d) => (
                 <button type="button" key={d} className="btn btn-sm" aria-pressed={v.due_date === addDaysISO(d)} onClick={() => set('due_date')(addDaysISO(d))}>
                   {d} วัน
