@@ -5,7 +5,7 @@ import { api } from '../api.js';
 import { useLookup, useDraft, useLeaveGuard } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Field, Select, Empty, CategorySelect, KIND_LABEL, DraftNotice, focusFirstError } from '../components/ui.jsx';
+import { PageHeader, Card, Field, Select, Empty, CategorySelect, KIND_LABEL, DraftNotice, focusFirstError, ActionBar } from '../components/ui.jsx';
 import ItemPicker from '../components/ItemPicker.jsx';
 import DocList from '../components/DocList.jsx';
 import { fmtMoney, fmtNum, todayISO, daysFromToday } from '../format.js';
@@ -108,11 +108,7 @@ export default function Receive() {
 
   return (
     <>
-      <PageHeader title="รับเข้า" sub="บันทึกของเข้าคลังเป็นใบรับเข้า — รวมอุปกรณ์รายชิ้นและรายการนับจำนวนได้ในใบเดียว">
-        <button className="btn btn-primary" onClick={submit} disabled={busy || !lines.length}>
-          <Save size={16} />{busy ? 'กำลังบันทึก…' : `บันทึกรับเข้า${lines.length ? ` (${lines.length} รายการ)` : ''}`}
-        </button>
-      </PageHeader>
+      <PageHeader title="รับเข้า" sub="บันทึกของเข้าคลังเป็นใบรับเข้า — รวมอุปกรณ์รายชิ้นและรายการนับจำนวนได้ในใบเดียว" />
 
       {restored && lines.length > 0 && <DraftNotice at={restored} what="ใบรับเข้า" onDiscard={startOver} />}
 
@@ -228,17 +224,20 @@ export default function Receive() {
             </div>
           )))}
         </div>
-        {lines.length > 0 && (
-          <div className="line-summary">
-            {assetCount > 0 && <span>รายชิ้น <strong className="mono">{fmtNum(assetCount)}</strong> ชิ้น</span>}
-            {unitCount > 0 && <span>นับจำนวน <strong className="mono">{fmtNum(unitCount)}</strong> หน่วย</span>}
-            <span className="spacer" />
-            <span>มูลค่ารวม <strong className="mono" style={{ fontSize: 16 }}>{fmtMoney(total)}</strong></span>
-          </div>
-        )}
       </Card>
 
       <DocList type="receive" title="ใบรับเข้าล่าสุด" />
+
+      <ActionBar label="สรุปใบรับเข้า">
+        {!lines.length && <span>ยังไม่มีรายการ — ค้นหา/สแกน หรือกด “รายการใหม่”</span>}
+        {assetCount > 0 && <span>รายชิ้น <strong className="mono">{fmtNum(assetCount)}</strong> ชิ้น</span>}
+        {unitCount > 0 && <span>นับจำนวน <strong className="mono">{fmtNum(unitCount)}</strong> หน่วย</span>}
+        <span className="spacer" />
+        {lines.length > 0 && <span>มูลค่ารวม <strong className="mono total">{fmtMoney(total)}</strong></span>}
+        <button className="btn btn-primary" onClick={submit} disabled={busy || !lines.length}>
+          <Save size={16} />{busy ? 'กำลังบันทึก…' : `บันทึกรับเข้า${lines.length ? ` (${lines.length} รายการ)` : ''}`}
+        </button>
+      </ActionBar>
     </>
   );
 }

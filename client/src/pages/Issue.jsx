@@ -6,7 +6,7 @@ import { clearLookupCache, useDraft, useLeaveGuard } from '../hooks.js';
 import RecipientFields, { EMPTY_RECIPIENT, hasRecipient } from '../components/RecipientFields.jsx';
 import { useAuth } from '../auth.jsx';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Field, Empty, StatusChip, STATUS, DraftNotice, focusFirstError } from '../components/ui.jsx';
+import { PageHeader, Card, Field, Empty, StatusChip, STATUS, DraftNotice, focusFirstError, ActionBar } from '../components/ui.jsx';
 import ItemPicker from '../components/ItemPicker.jsx';
 import DocList from '../components/DocList.jsx';
 import { fmtNum, todayISO, addDaysISO, daysFromToday } from '../format.js';
@@ -110,12 +110,7 @@ export default function Issue() {
     <>
       <PageHeader title={order ? `ส่งมอบ ${order.order.order_no}` : 'เบิกออก'}
         sub={order ? 'ใบเบิกสำหรับส่งมอบของตามรายการสั่งซื้อ — ตรวจรายการและผู้รับ แล้วบันทึก รายการสั่งซื้อจะเป็น “ส่งมอบแล้ว”' : 'จ่ายอุปกรณ์ให้พนักงานหรือส่วนงานเป็นใบเบิก — สแกนหลายชิ้นต่อกันได้ บันทึกพร้อมกันทั้งใบ'}
-        crumbs={order ? [{ label: 'รายการสั่งซื้อ', to: '/orders' }, { label: order.order.order_no, to: `/orders/${order.order.id}` }, { label: 'ส่งมอบ' }] : undefined}>
-        <button className="btn btn-primary" onClick={submit} disabled={busy || !lines.length || (orderId && !order)}>
-          {order ? <PackageCheck size={16} /> : <Save size={16} />}
-          {busy ? 'กำลังบันทึก…' : `${order ? 'บันทึกส่งมอบ' : 'บันทึกเบิกออก'}${lines.length ? ` (${lines.length} รายการ)` : ''}`}
-        </button>
-      </PageHeader>
+        crumbs={order ? [{ label: 'รายการสั่งซื้อ', to: '/orders' }, { label: order.order.order_no, to: `/orders/${order.order.id}` }, { label: 'ส่งมอบ' }] : undefined} />
 
       {order?.short.length > 0 && (
         <div className="alert">
@@ -192,15 +187,21 @@ export default function Issue() {
             </div>
           ))}
         </div>
-        {lines.length > 0 && (
-          <div className="line-summary">
-            {assetLines.length > 0 && <span>รายชิ้น <strong className="mono">{assetLines.length}</strong> ชิ้น</span>}
-            {lines.length - assetLines.length > 0 && <span>นับจำนวน <strong className="mono">{fmtNum(lines.filter((l) => l.item.kind === 'consumable').reduce((s, l) => s + l.qty, 0))}</strong> หน่วย</span>}
-          </div>
-        )}
       </Card>
 
-      <DocList type="issue" title="ใบเบิกล่าสุด" />
+      {!order && <DocList type="issue" title="ใบเบิกล่าสุด" />}
+
+      <ActionBar label="สรุปใบเบิก">
+        {!lines.length && <span>ยังไม่มีรายการ — สแกนหรือค้นหาเพื่อเพิ่ม</span>}
+        {assetLines.length > 0 && <span>รายชิ้น <strong className="mono">{assetLines.length}</strong> ชิ้น</span>}
+        {lines.length - assetLines.length > 0 && <span>นับจำนวน <strong className="mono">{fmtNum(lines.filter((l) => l.item.kind === 'consumable').reduce((s, l) => s + l.qty, 0))}</strong> หน่วย</span>}
+        {hasRecipient(who) && <span>ผู้รับ <strong>{who.person_name || who.department_name}</strong></span>}
+        <span className="spacer" />
+        <button className="btn btn-primary" onClick={submit} disabled={busy || !lines.length || (orderId && !order)}>
+          {order ? <PackageCheck size={16} /> : <Save size={16} />}
+          {busy ? 'กำลังบันทึก…' : `${order ? 'บันทึกส่งมอบ' : head.mode === 'borrow' ? 'บันทึกการยืม' : 'บันทึกเบิกออก'}${lines.length ? ` (${lines.length} รายการ)` : ''}`}
+        </button>
+      </ActionBar>
     </>
   );
 }

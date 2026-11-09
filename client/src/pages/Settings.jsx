@@ -50,7 +50,7 @@ export default function SettingsPage() {
             </div>
           </Card>
           <Card title="การเก็บ Log (PDPA)">
-            <Field label="ระยะเวลาเก็บ Access Log และ Audit Trail (วัน)" hint="ช่วง 90–3650 วัน · log ที่เก่ากว่านี้จะถูกลบอัตโนมัติ เนื่องจากมีข้อมูลส่วนบุคคล (IP, ชื่อผู้ใช้)">
+            <Field label="ระยะเวลาเก็บบันทึกการเข้าระบบและประวัติการแก้ไข (วัน)" hint="ช่วง 90–3650 วัน · log ที่เก่ากว่านี้จะถูกลบอัตโนมัติ เนื่องจากมีข้อมูลส่วนบุคคล (IP, ชื่อผู้ใช้)">
               <input type="number" className="input mono" value={v.log_retention_days} onChange={set('log_retention_days')} style={{ maxWidth: 160 }} />
             </Field>
           </Card>

@@ -142,6 +142,11 @@ export function Modal({ title, onClose, children, footer, wide, initialFocus = t
   );
 }
 
+// Summary + the screen's main action, pinned to the bottom of the viewport while a long form scrolls.
+export function ActionBar({ label = 'สรุปและบันทึก', children }) {
+  return <div className="action-bar no-print" role="region" aria-label={label}>{children}</div>;
+}
+
 // After a failed validation: bring the first highlighted field into view and focus it.
 export function focusFirstError(root = document) {
   requestAnimationFrame(() => {

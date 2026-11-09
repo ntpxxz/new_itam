@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CheckCircle2, XCircle, Package, Laptop, Ban, ClipboardList, PackageCheck, FileText } from 'lucide-react';
+import { CheckCircle2, XCircle, Package, Laptop, Ban, ClipboardList, PackageCheck, FileText, Check, X } from 'lucide-react';
 import { useApi } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
@@ -73,6 +73,7 @@ export default function OrderDetail() {
   return (
     <>
       <PageHeader title={`รายการสั่งซื้อ ${o.order_no}`} crumbs={[{ label: 'รายการสั่งซื้อ', to: '/orders' }, { label: o.order_no }]} />
+      <OrderSteps order={o} lines={lines} />
 
       <div className="detail-grid">
         <Card title="รายการ" noBody>
@@ -186,6 +187,42 @@ export default function OrderDetail() {
           onConfirm={() => act('cancel', {}, `ยกเลิก ${o.order_no} แล้ว`)} onClose={() => setDialog(null)} />
       )}
     </>
+  );
+}
+
+// Where the order is: ส่งรายการ → อนุมัติ → ออกใบสั่งซื้อ → รับของ → ส่งมอบ (rejected / cancelled stop at the step they hit).
+function OrderSteps({ order: o, lines }) {
+  const active = lines.filter((l) => l.receipt_status && l.receipt_status !== 'cancelled');
+  const approved = ['approved', 'delivered'].includes(o.status);
+  const onPo = approved && active.length > 0 && active.every((l) => l.po_id || l.receipt_status === 'received');
+  const got = approved && active.length > 0 && active.every((l) => l.receipt_status === 'received');
+  const someGot = active.some((l) => l.receipt_status === 'received');
+  const poNos = [...new Set(active.map((l) => l.po_no).filter(Boolean))];
+  const steps = [
+    { label: 'ส่งรายการ', done: true, sub: fmtDateTime(o.created_at) },
+    { label: 'อนุมัติ', done: approved, sub: approved ? fmtDateTime(o.reviewed_at) : 'ผู้ดูแลตรวจสอบ' },
+    { label: 'ออกใบสั่งซื้อ', done: onPo || o.status === 'delivered', sub: poNos.length ? poNos.join(', ') : 'สั่งของจากผู้ขาย' },
+    { label: 'รับของ', done: got || o.status === 'delivered', sub: someGot && !got ? `รับแล้ว ${active.filter((l) => l.receipt_status === 'received').length}/${active.length}` : 'ของเข้าคลัง' },
+    { label: 'ส่งมอบ', done: o.status === 'delivered', sub: o.delivered_at ? fmtDateTime(o.delivered_at) : 'ผู้สั่งรับของ' },
+  ];
+  const current = steps.findIndex((s) => !s.done);
+  const stopped = o.status === 'rejected' ? 1 : o.status === 'cancelled' ? Math.max(1, current) : -1;
+  return (
+    <ol className="steps" aria-label="ความคืบหน้ารายการสั่งซื้อ">
+      {steps.map((s, i) => {
+        const state = i === stopped ? 'stopped' : s.done ? 'done' : i === current && stopped < 0 ? 'current' : 'todo';
+        const sub = i === stopped ? (o.status === 'rejected' ? 'ไม่อนุมัติ' : `ยกเลิก ${fmtDateTime(o.cancelled_at)}`) : s.sub;
+        return (
+          <li key={s.label} className={`step ${state}`} aria-current={state === 'current' ? 'step' : undefined}>
+            <span className="step-node" aria-hidden>{state === 'done' ? <Check size={12} /> : state === 'stopped' ? <X size={12} /> : i + 1}</span>
+            <span className="step-text">
+              <span className="step-label">{s.label}<span className="sr-only">{{ done: ' (เสร็จแล้ว)', current: ' (ขั้นตอนปัจจุบัน)', stopped: ' (หยุด)', todo: '' }[state]}</span></span>
+              <span className="step-sub">{sub}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

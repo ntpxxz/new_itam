@@ -19,9 +19,9 @@ const NAV = [
     label: 'ทรัพย์สิน',
     items: [
       { to: '/assets', label: 'อุปกรณ์', icon: Laptop, perm: ['asset.view', 'consumable.view'], badge: 'lowStock' },
-      { to: '/receive', label: 'รับเข้า', icon: PackagePlus, perm: ['asset.create', 'consumable.move'] },
-      { to: '/pending-receive', label: 'รอรับเข้า', icon: ClipboardList, perm: 'consumable.view', badge: 'pendingReceive' },
-      { to: '/issue', label: 'เบิกออก', icon: PackageMinus, perm: ['asset.transact', 'consumable.move'] },
+      { to: '/receive', label: 'รับเข้า', hint: 'บันทึกของเข้าคลังทันที (ใบรับเข้า RCV)', icon: PackagePlus, perm: ['asset.create', 'consumable.move'] },
+      { to: '/pending-receive', label: 'รอรับเข้า', hint: 'ของที่สั่งแล้ว / ไฟล์ CSV รอของมาถึง แล้วค่อยกดรับเข้า', icon: ClipboardList, perm: 'consumable.view', badge: 'pendingReceive' },
+      { to: '/issue', label: 'เบิกออก', hint: 'จ่ายของหรือให้ยืม (ใบเบิก ISS)', icon: PackageMinus, perm: ['asset.transact', 'consumable.move'] },
       { to: '/loans', label: 'ยืม-คืน', icon: ArrowLeftRight, perm: 'loan.view', badge: 'overdue' },
       { to: '/history', label: 'ประวัติรายการ', icon: History, perm: 'history.view' },
     ],
@@ -29,9 +29,9 @@ const NAV = [
   {
     label: 'สั่งซื้อ',
     items: [
-      { to: '/shop', label: 'สั่งซื้อสินค้า', icon: ShoppingCart, perm: 'order.create' },
-      { to: '/orders', label: 'รายการสั่งซื้อ', icon: ReceiptText, perm: ['order.create', 'order.manage'], badge: 'pendingOrders' },
-      { to: '/purchase-orders', label: 'ใบสั่งซื้อ', icon: FileText, perm: 'order.manage' },
+      { to: '/shop', label: 'สั่งซื้อสินค้า', hint: 'เลือกของใส่ตะกร้าเพื่อขอสั่งซื้อ', icon: ShoppingCart, perm: 'order.create' },
+      { to: '/orders', label: 'รายการสั่งซื้อ', hint: 'คำขอสั่งซื้อจากผู้ใช้ (ORD) — อนุมัติและติดตามสถานะ', icon: ReceiptText, perm: ['order.create', 'order.manage'], badge: 'pendingOrders' },
+      { to: '/purchase-orders', label: 'ใบสั่งซื้อ (PO)', hint: 'ใบสั่งซื้อถึงผู้ขาย รวมจากรายการที่อนุมัติแล้ว', icon: FileText, perm: 'order.manage' },
     ],
   },
   {
@@ -54,7 +54,7 @@ const NAV = [
       { to: '/master', label: 'ข้อมูลหลัก', icon: Database, perm: 'master.manage' },
       { to: '/admin/users', label: 'ผู้ใช้งาน', icon: UserCog, perm: 'user.manage' },
       { to: '/admin/roles', label: 'บทบาทและสิทธิ์', icon: ShieldCheck, perm: 'role.manage' },
-      { to: '/logs', label: 'Log การใช้งาน', icon: ScrollText, perm: 'log.view' },
+      { to: '/logs', label: 'บันทึกการใช้งาน', icon: ScrollText, perm: 'log.view' },
       { to: '/settings', label: 'ตั้งค่าระบบ', icon: Settings, perm: 'settings.manage' },
     ],
   },
@@ -128,7 +128,7 @@ export default function Layout() {
               <div className="nav-section" key={sec.label}>
                 <div className="nav-label">{sec.label}</div>
                 {items.map((i) => (
-                  <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} title={i.label}>
+                  <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} title={i.hint ? `${i.label} — ${i.hint}` : i.label}>
                     <i.icon size={16} aria-hidden />
                     <span className="nav-text">{i.label}</span>
                     {i.badge && badges[i.badge] > 0 && (

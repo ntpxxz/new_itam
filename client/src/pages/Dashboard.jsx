@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Plus, AlertTriangle, ShieldAlert, PackageX, Archive, CalendarClock } from 'lucide-react';
+import { Plus, AlertTriangle, ShieldAlert, PackageX, Archive, CalendarClock, PackagePlus, PackageMinus, Undo2, ScanLine } from 'lucide-react';
 import { useApi } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { PageHeader, Card, Loading, Empty, STATUS_DOT } from '../components/ui.jsx';
@@ -56,6 +56,31 @@ function SpendChart({ data }) {
   );
 }
 
+// The everyday jobs, one tap from the start page (only those this user may do).
+const QUICK = [
+  { to: '/receive', label: 'รับเข้า', hint: 'ของเข้าคลัง', icon: PackagePlus, perm: ['asset.create', 'consumable.move'] },
+  { to: '/issue', label: 'เบิกออก', hint: 'จ่ายให้พนักงาน', icon: PackageMinus, perm: ['asset.transact', 'consumable.move'] },
+  { to: '/issue?mode=borrow', label: 'ยืม', hint: 'มีกำหนดคืน', icon: CalendarClock, perm: ['asset.transact'] },
+  { to: '/loans', label: 'รับคืน', hint: 'รายการที่ยืมอยู่', icon: Undo2, perm: ['loan.view'] },
+  { to: '/scan', label: 'สแกน QR', hint: 'เปิดอุปกรณ์จากสติ๊กเกอร์', icon: ScanLine, perm: ['scan.use'] },
+  { to: '/assets/new', label: 'เพิ่มอุปกรณ์', hint: 'ลงทะเบียนรายการใหม่', icon: Plus, perm: ['asset.create', 'consumable.manage'] },
+];
+
+function QuickActions({ can }) {
+  const items = QUICK.filter((x) => x.perm.some(can));
+  if (!items.length) return null;
+  return (
+    <nav className="quick-actions" aria-label="ทำรายการด่วน">
+      {items.map((x) => (
+        <Link key={x.to} to={x.to} className="quick-action">
+          <span className="quick-icon"><x.icon size={18} aria-hidden /></span>
+          <span className="quick-text"><span className="quick-label">{x.label}</span><span className="quick-hint">{x.hint}</span></span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 export default function Dashboard() {
   const { can, user } = useAuth();
   const { data, loading } = useApi('/api/dashboard');
@@ -68,9 +93,9 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader title="ภาพรวม" sub={`${greet}, ${user.full_name.split(' ')[0]} · ${fmtDate(new Date())}`}>
-        {can('asset.create') && <Link to="/assets/new" className="btn btn-primary"><Plus size={16} />เพิ่มอุปกรณ์</Link>}
-      </PageHeader>
+      <PageHeader title="ภาพรวม" sub={`${greet}, ${user.full_name.split(' ')[0]} · ${fmtDate(new Date())}`} />
+
+      <QuickActions can={can} />
 
       <div className="kpi-row">
         <Kpi label="อุปกรณ์ทั้งหมด" value={data.total} dot="var(--text)" to="/assets" trend={`${data.byCategory.length} หมวดหมู่ · ไม่รวม Scrap`} />

@@ -163,7 +163,7 @@ export default function Assets() {
       {confirmDel && (
         <Confirm title={`ลบ ${confirmDel.code}?`} danger confirmLabel="ลบ"
           message={confirmDel.kind === 'asset'
-            ? `"${confirmDel.name}" จะถูกซ่อนจากทะเบียน แต่ประวัติและ Audit Trail ยังถูกเก็บไว้ หากต้องการจำหน่ายจริงให้ใช้ "ส่งรอจำหน่าย" แทน`
+            ? `"${confirmDel.name}" จะถูกซ่อนจากทะเบียน แต่ประวัติและบันทึกการแก้ไขยังถูกเก็บไว้ หากต้องการจำหน่ายจริงให้ใช้ "ส่งรอจำหน่าย" แทน`
             : `"${confirmDel.name}" จะถูกซ่อนจากทะเบียน แต่ประวัติการรับเข้า-เบิกยังถูกเก็บไว้`}
           onConfirm={() => remove(confirmDel)} onClose={() => setConfirmDel(null)} />
       )}

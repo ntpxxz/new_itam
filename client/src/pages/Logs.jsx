@@ -52,11 +52,11 @@ export default function Logs() {
 
   return (
     <>
-      <PageHeader title="Log การใช้งาน" sub="บันทึกแบบเพิ่มได้อย่างเดียว แก้ไขหรือลบไม่ได้ · ลบอัตโนมัติเมื่อเกินระยะเวลาเก็บตาม PDPA">
+      <PageHeader title="บันทึกการใช้งาน" sub="บันทึกแบบเพิ่มได้อย่างเดียว แก้ไขหรือลบไม่ได้ · ลบอัตโนมัติเมื่อเกินระยะเวลาเก็บตาม PDPA">
         <Chip tone="neutral"><Lock size={11} />Immutable</Chip>
       </PageHeader>
       <Tabs value={f.tab} onChange={(tab) => setF({ tab, q: '', event: '', entity: '', entity_id: '' })} tabs={[
-        { value: 'access', label: 'Access Log' }, { value: 'audit', label: 'Audit Trail' },
+        { value: 'access', label: 'การเข้าระบบ (Access Log)' }, { value: 'audit', label: 'ประวัติการแก้ไข (Audit Trail)' },
       ]} />
       <Card noBody>
         <div className="toolbar">

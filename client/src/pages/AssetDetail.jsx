@@ -58,7 +58,7 @@ export default function AssetDetail() {
       <PageHeader title={a.name} crumbs={[{ label: 'อุปกรณ์', to: '/assets' }, { label: a.category_name, to: `/assets?category_id=${a.category_id}` }, { label: a.asset_tag }]}>
         <Menu label="การทำงานเพิ่มเติม" buttonClass="icon-btn" items={[
           can('label.print') && { label: 'พิมพ์สติ๊กเกอร์', to: `/labels?ids=${a.id}`, icon: <Printer size={15} /> },
-          can('log.view') && { label: 'ดู Audit Trail', to: `/logs?tab=audit&entity=asset&entity_id=${a.id}`, icon: <ScrollText size={15} /> },
+          can('log.view') && { label: 'ดูประวัติการแก้ไข', to: `/logs?tab=audit&entity=asset&entity_id=${a.id}`, icon: <ScrollText size={15} /> },
           can('asset.delete') && !['borrowed', 'issued', 'repair'].includes(a.status) && '-',
           can('asset.delete') && !['borrowed', 'issued', 'repair'].includes(a.status) && { label: 'ลบอุปกรณ์', onClick: () => setConfirmDel(true), icon: <Trash2 size={15} />, danger: true },
         ]} />
@@ -203,7 +203,7 @@ export default function AssetDetail() {
       {action && <ActionDialog asset={a} action={action} onClose={() => setAction(null)} onDone={() => { setAction(null); reload(); }} />}
       {confirmDel && (
         <Confirm title={`ลบ ${a.asset_tag}?`} danger confirmLabel="ลบอุปกรณ์" onConfirm={remove} onClose={() => setConfirmDel(false)}
-          message="อุปกรณ์จะถูกซ่อนจากทะเบียน แต่ประวัติและ Audit Trail ยังถูกเก็บไว้ หากต้องการจำหน่ายจริงให้ใช้ “ส่งรอจำหน่าย” แทน" />
+          message="อุปกรณ์จะถูกซ่อนจากทะเบียน แต่ประวัติและบันทึกการแก้ไขยังถูกเก็บไว้ หากต้องการจำหน่ายจริงให้ใช้ “ส่งรอจำหน่าย” แทน" />
       )}
     </>
   );

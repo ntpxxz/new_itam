@@ -5,7 +5,7 @@ import { api } from '../api.js';
 import { useLookup } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Field, Select, Empty, Loading, Modal, Confirm, Chip, Tabs } from '../components/ui.jsx';
+import { PageHeader, Card, Field, Select, Empty, Loading, Modal, Confirm, Chip, Tabs, ActionBar, Menu } from '../components/ui.jsx';
 import { fmtMoney, fmtNum, fmtDateTime, todayISO } from '../format.js';
 import { readCsvFile, receiveRows, downloadReceiveTemplate } from '../csv.js';
 
@@ -102,13 +102,7 @@ export default function PendingReceive() {
   const edit = pending && canMove;
   return (
     <>
-      <PageHeader title="รายการรอรับเข้า" sub="รายการจากใบสั่งซื้อ (PO) และไฟล์รายการของที่จะเข้า รออยู่ที่นี่ — เลือกรับเข้าเมื่อของมาถึง สต็อกจะอัปเดตเมื่อกด “รับเข้า” เท่านั้น">
-        {pending && canMove && (
-          <button className="btn btn-primary" onClick={() => setReceiveOpen(true)} disabled={!chosenReady.length}>
-            <PackageCheck size={16} />รับเข้าที่เลือก{chosenReady.length ? ` (${chosenReady.length})` : ''}
-          </button>
-        )}
-      </PageHeader>
+      <PageHeader title="รายการรอรับเข้า" sub="รายการจากใบสั่งซื้อ (PO) และไฟล์ CSV รออยู่ที่นี่ — ของมาถึงแล้วให้ติ๊กรายการ แล้วกด “รับเข้าที่เลือก” ด้านล่าง สต็อกจะอัปเดตเมื่อรับเข้าเท่านั้น" />
 
       <Card noBody>
         <div className="toolbar" style={{ flexWrap: 'wrap' }}>
@@ -146,7 +140,7 @@ export default function PendingReceive() {
             <div className="alert danger">
               <AlertTriangle size={18} />
               <span className="alert-detail">
-                <strong>มี {incomplete.length} รายการข้อมูลไม่ครบ</strong> — กรอกบาร์โค้ด/SKU หรือจำนวนในแถวนั้นให้ครบ (บันทึกเมื่อออกจากช่อง) หรือเลือกแล้วกด “ยกเลิกรายการที่เลือก”
+                <strong>มี {incomplete.length} รายการข้อมูลไม่ครบ</strong> — กรอกบาร์โค้ด/SKU หรือจำนวนในแถวนั้นให้ครบ (บันทึกเมื่อออกจากช่อง) หรือติ๊กเลือกแล้วกด “จัดการ…” → ยกเลิก
               </span>
             </div>
           )}
@@ -271,17 +265,23 @@ export default function PendingReceive() {
             </div>
           )}
 
-          {pending && canMove && chosen.length > 0 && (
-            <div className="line-summary">
-              <span>เลือก <strong className="mono">{chosen.length}</strong> รายการ · พร้อมรับเข้า <strong className="mono">{chosenReady.length}</strong>
-                {' '}· รวม <strong className="mono">{fmtNum(chosenReady.reduce((s, r) => s + r.qty, 0))}</strong> หน่วย</span>
-              <span className="spacer" />
-              <button className="btn btn-sm btn-danger" onClick={() => setCancelOpen(true)}><XCircle size={14} />ยกเลิกรายการที่เลือก</button>
-              <button className="btn btn-sm btn-danger" onClick={() => setDeleting(chosen)}><Trash2 size={14} />ลบรายการที่เลือก</button>
-            </div>
-          )}
         </div>
       </Card>
+
+      {pending && canMove && chosen.length > 0 && (
+        <ActionBar label="รายการที่เลือก">
+          <span>เลือก <strong className="mono">{chosen.length}</strong> รายการ · พร้อมรับเข้า <strong className="mono">{chosenReady.length}</strong>
+            {' '}· รวม <strong className="mono">{fmtNum(chosenReady.reduce((s, r) => s + r.qty, 0))}</strong> หน่วย</span>
+          <span className="spacer" />
+          <Menu label="จัดการรายการที่เลือก" buttonClass="btn" icon={<>จัดการ…</>} items={[
+            { label: 'ยกเลิก (เก็บไว้ในแท็บ “ยกเลิก”)', onClick: () => setCancelOpen(true), icon: <XCircle size={15} /> },
+            { label: 'ลบออกจากรายการ', onClick: () => setDeleting(chosen), icon: <Trash2 size={15} />, danger: true },
+          ]} />
+          <button className="btn btn-primary" onClick={() => setReceiveOpen(true)} disabled={!chosenReady.length}>
+            <PackageCheck size={16} />รับเข้าที่เลือก{chosenReady.length ? ` (${chosenReady.length})` : ''}
+          </button>
+        </ActionBar>
+      )}
 
       {receiveOpen && (
         <ReceiveDialog rows={chosenReady} skipped={chosen.length - chosenReady.length} onClose={() => setReceiveOpen(false)}
