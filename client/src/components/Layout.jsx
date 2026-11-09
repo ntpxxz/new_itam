@@ -173,9 +173,6 @@ export default function Layout() {
                 <ShoppingCart size={18} />{cart.length > 0 && <span className="count mono" aria-hidden>{cart.length}</span>}
               </Link>
             )}
-            {can('asset.view') && (
-              <Link to="/scan" className="icon-btn" aria-label="สแกน QR" title="สแกน QR"><ScanLine size={18} /></Link>
-            )}
             <NotificationBell badges={badges} onChange={loadBadges} />
             <Menu
               label="บัญชีผู้ใช้"
