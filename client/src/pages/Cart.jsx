@@ -7,18 +7,16 @@ import { useCart, setCart, setLineQty, clearCart, maxQty } from '../cart.js';
 import { useToast } from '../components/Toast.jsx';
 import Photo from '../components/Photo.jsx';
 import { PageHeader, Card, Field, Empty, Loading, Confirm } from '../components/ui.jsx';
-import RecipientFields from '../components/RecipientFields.jsx';
 import QtyStepper from '../components/QtyStepper.jsx';
 import { fmtNum, fmtMoney } from '../format.js';
 
-// ตะกร้า: review the cart, set the recipient and send the purchase order. Stock level doesn't limit quantities.
+// ตะกร้า: review the cart and send the purchase order to the approvers. The recipient is always the ordering user. Stock level doesn't limit quantities.
 export default function Cart() {
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const cart = useCart();
   const [items, setItems] = useState(null);
-  const [who, setWho] = useState({ person_name: user.full_name || '', department_name: '' });
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -38,11 +36,11 @@ export default function Cart() {
     setBusy(true);
     try {
       const o = await api.post('/api/orders', {
-        ...who, note,
+        note,
         lines: lines.map(({ qty, item: x }) => ({ kind: x.kind, consumable_id: x.consumable_id, category_id: x.category_id, name: x.name, brand: x.brand, model: x.model, qty })),
       });
       clearCart();
-      toast.success(`ส่งใบสั่งซื้อ ${o.order_no} แล้ว — รอผู้ดูแลอนุมัติ`);
+      toast.success(`ส่งรายการสั่งซื้อ ${o.order_no} แล้ว — รอผู้ดูแลอนุมัติ`);
       navigate(`/orders/${o.id}`);
     } catch (e) { toast.error(e); load(); setBusy(false); }
   };
@@ -50,7 +48,7 @@ export default function Cart() {
   return (
     <>
       <PageHeader title="ตะกร้า" crumbs={[{ label: 'สั่งซื้อสินค้า', to: '/shop' }, { label: 'ตะกร้า' }]}
-        sub="ตรวจรายการและจำนวน ระบุผู้รับ แล้วกดส่งใบสั่งซื้อ">
+        sub="ตรวจรายการและจำนวน แล้วกดส่งรายการสั่งซื้อให้ผู้ดูแลอนุมัติ">
         <Link to="/shop" className="btn btn-ghost"><ArrowLeft size={16} />เลือกสินค้าต่อ</Link>
       </PageHeader>
 
@@ -63,12 +61,12 @@ export default function Cart() {
       ) : (
         <div className="two-col shop-layout">
           <Card title={`รายการ (${cart.length})`} noBody
-            actions={<button className="btn btn-sm btn-ghost" onClick={() => setClearing(true)}><Trash2 size={14} />ล้างตะกร้า</button>}>
+            actions={<button className="btn btn-sm btn-danger" onClick={() => setClearing(true)}><Trash2 size={14} />ล้างตะกร้า</button>}>
             {gone.length > 0 && (
               <div className="card-body" style={{ paddingBottom: 0 }}>
                 <div className="alert danger">
                   <AlertTriangle size={18} />
-                  <span className="alert-detail"><strong>{gone.length} รายการไม่มีในระบบแล้ว</strong> — ลบรายการที่ขึ้นสีแดงออกก่อนส่งใบสั่งซื้อ</span>
+                  <span className="alert-detail"><strong>{gone.length} รายการไม่มีในระบบแล้ว</strong> — ลบรายการที่ขึ้นสีแดงออกก่อนส่งรายการสั่งซื้อ</span>
                 </div>
               </div>
             )}
@@ -126,12 +124,17 @@ export default function Cart() {
           <div className="stack shop-cart">
             <Card title="ผู้รับ"
               foot={
-                <button className="btn btn-primary" style={{ width: '100%' }} onClick={submit} disabled={busy || !items || gone.length > 0}>
-                  {busy ? 'กำลังส่ง…' : `ส่งใบสั่งซื้อ · ${fmtNum(units)} หน่วย`}
-                </button>
+                <div className="card-actions">
+                  <button className="btn btn-primary" onClick={submit} disabled={busy || !items || gone.length > 0}>
+                    {busy ? 'กำลังส่ง…' : `ส่งรายการสั่งซื้อ · ${fmtNum(units)} หน่วย`}
+                  </button>
+                </div>
               }>
               <div className="stack" style={{ gap: 12 }}>
-                <RecipientFields value={who} onChange={setWho} required={false} compact />
+                <dl className="dl">
+                  <dt>ผู้สั่ง / ผู้รับ</dt><dd>{user.full_name}</dd>
+                  <dt>ผู้อนุมัติ</dt><dd>ผู้ดูแลระบบ<div className="cell-sub">ได้รับแจ้งเตือนทันทีเมื่อส่งรายการสั่งซื้อ</div></dd>
+                </dl>
                 <Field label="หมายเหตุ" hint="เช่น เหตุผลที่สั่ง ใช้งานโครงการไหน หรือร้านที่แนะนำ">
                   <textarea className="input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
                 </Field>

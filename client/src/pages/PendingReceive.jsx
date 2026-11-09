@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ClipboardList, FileUp, Download, AlertTriangle, PackageCheck, PackagePlus, Search, Trash2, XCircle } from 'lucide-react';
 import { api } from '../api.js';
 import { useLookup } from '../hooks.js';
@@ -19,7 +19,8 @@ export default function PendingReceive() {
   const navigate = useNavigate();
   const canMove = can('consumable.move');
   const [status, setStatus] = useState('pending');
-  const [q, setQ] = useState('');
+  const [sp] = useSearchParams();
+  const [q, setQ] = useState(sp.get('q') || '');
   const [data, setData] = useState(null);
   const [picked, setPicked] = useState(new Set());
   const [busy, setBusy] = useState(false);
@@ -90,7 +91,7 @@ export default function PendingReceive() {
   const edit = pending && canMove;
   return (
     <>
-      <PageHeader title="รายการรอรับเข้า" sub="ใบสั่งซื้อที่อนุมัติแล้ว และไฟล์รายการของที่จะเข้า รออยู่ที่นี่ — เลือกรับเข้าเมื่อของมาถึง สต็อกจะอัปเดตเมื่อกด “รับเข้า” เท่านั้น">
+      <PageHeader title="รายการรอรับเข้า" sub="รายการจากใบสั่งซื้อ (PO) และไฟล์รายการของที่จะเข้า รออยู่ที่นี่ — เลือกรับเข้าเมื่อของมาถึง สต็อกจะอัปเดตเมื่อกด “รับเข้า” เท่านั้น">
         {pending && canMove && (
           <button className="btn btn-primary" onClick={() => setReceiveOpen(true)} disabled={!chosenReady.length}>
             <PackageCheck size={16} />รับเข้าที่เลือก{chosenReady.length ? ` (${chosenReady.length})` : ''}
@@ -107,7 +108,7 @@ export default function PendingReceive() {
           ]} />
           <div className="input-icon" style={{ flex: '1 1 220px' }}>
             <Search size={16} aria-hidden />
-            <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา SKU, ชื่อ, ชื่อไฟล์, เลขใบสั่งซื้อ" aria-label="ค้นหารายการรอรับเข้า" />
+            <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา SKU, ชื่อ, ชื่อไฟล์, เลขรายการสั่งซื้อ" aria-label="ค้นหารายการรอรับเข้า" />
           </div>
           {canMove && (
             <>
@@ -197,6 +198,7 @@ export default function PendingReceive() {
                           {r.order_id ? <Link to={`/orders/${r.order_id}`} className="mono">{r.order_no}</Link> : r.file_name || '—'}
                           {r.line_no ? ` · ${r.order_id ? 'รายการ' : 'แถว'} ${r.line_no}` : ''}
                         </div>
+                        {r.po_no && <div className="cell-sub">{can('order.manage') ? <Link to={`/purchase-orders/${r.po_id}`} className="mono">{r.po_no}</Link> : <span className="mono">{r.po_no}</span>}</div>}
                         <div className="cell-sub">{fmtDateTime(r.created_at)} · {r.created_by_name}</div>
                       </td>
                       <td className="text-right mono">{r.item_id ? `${fmtNum(r.qty_on_hand)} ${r.unit}` : '—'}</td>
@@ -258,8 +260,8 @@ export default function PendingReceive() {
               <span>เลือก <strong className="mono">{chosen.length}</strong> รายการ · พร้อมรับเข้า <strong className="mono">{chosenReady.length}</strong>
                 {' '}· รวม <strong className="mono">{fmtNum(chosenReady.reduce((s, r) => s + r.qty, 0))}</strong> หน่วย</span>
               <span className="spacer" />
-              <button className="btn btn-sm btn-ghost" onClick={() => setCancelOpen(true)}><XCircle size={14} />ยกเลิกรายการที่เลือก</button>
-              <button className="btn btn-sm btn-ghost" onClick={() => setDeleting(chosen)}><Trash2 size={14} />ลบรายการที่เลือก</button>
+              <button className="btn btn-sm btn-danger" onClick={() => setCancelOpen(true)}><XCircle size={14} />ยกเลิกรายการที่เลือก</button>
+              <button className="btn btn-sm btn-danger" onClick={() => setDeleting(chosen)}><Trash2 size={14} />ลบรายการที่เลือก</button>
             </div>
           )}
         </div>
@@ -293,7 +295,8 @@ function ReceiveDialog({ rows, skipped, onClose, onDone }) {
   const toast = useToast();
   const vendors = useLookup('vendors');
   const locs = useLookup('locations');
-  const [head, setHead] = useState({ doc_date: todayISO(), vendor_id: '', location_id: '', po_number: '', invoice_number: '', note: '' });
+  const po = rows.length && rows.every((r) => r.po_id && r.po_id === rows[0].po_id) ? rows[0] : null;
+  const [head, setHead] = useState({ doc_date: todayISO(), vendor_id: po ? String(po.po_vendor_id) : '', location_id: '', po_number: po?.po_no || '', invoice_number: '', note: '' });
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setHead((h) => ({ ...h, [k]: v?.target ? v.target.value : v }));
   const units = useMemo(() => rows.reduce((s, r) => s + r.qty, 0), [rows]);

@@ -7,7 +7,7 @@ import { resolveRecipient } from '../recipient.js';
 import { createIssueDoc } from './documents.js';
 import { notify } from '../notify.js';
 
-// ใบสั่งซื้อ: cart → pending → (admin) approved or rejected. Approving moves the approved lines to รายการรอรับเข้า
+// รายการสั่งซื้อ: cart → pending → (admin) approved or rejected. Approving moves the approved lines to รายการรอรับเข้า
 // (pending_receipts.order_line_id), where the goods are received as a normal RCV slip. Any registered item, any stock level.
 // Once no line is still waiting there, a manager hands the goods over with a normal ISS slip → delivered.
 const r = Router();
@@ -55,14 +55,14 @@ const ORDER_SELECT = `
 
 async function loadOrder(req, id) {
   const o = await get(`${ORDER_SELECT} WHERE o.id = ?`, toInt(id));
-  if (!o || (!can(req.user, 'order.manage') && o.requested_by !== req.user.id)) throw notFound('ใบสั่งซื้อ');
+  if (!o || (!can(req.user, 'order.manage') && o.requested_by !== req.user.id)) throw notFound('รายการสั่งซื้อ');
   return o;
 }
 
 // What an approved order can hand over now, as item-picker rows: consumables from stock (capped at on hand), and the
 // asset units its RCV slip created that are still available. Refused while any line still waits in รอรับเข้า.
 async function handoverDraft(o) {
-  if (o.status !== 'approved') throw bad('ส่งมอบได้เฉพาะใบสั่งซื้อที่อนุมัติแล้วและยังไม่ส่งมอบ');
+  if (o.status !== 'approved') throw bad('ส่งมอบได้เฉพาะรายการสั่งซื้อที่อนุมัติแล้วและยังไม่ส่งมอบ');
   const lines = await all(`SELECT l.*, pr.status AS receipt_status, pr.qty AS receipt_qty, pr.doc_id AS receipt_doc_id
     FROM order_lines l JOIN pending_receipts pr ON pr.order_line_id = l.id AND pr.deleted_at IS NULL
     WHERE l.order_id = ? ORDER BY l.id`, o.id);
@@ -95,7 +95,7 @@ r.get('/catalog', ANY, async (req, res) => {
   res.json({ rows: await catalog() });
 });
 
-// body: { person_name, department_name, note, lines: [{ kind, consumable_id | category_id+name+brand+model, qty }] }
+// body: { note, lines: [{ kind, consumable_id | category_id+name+brand+model, qty }] } — recipient = the ordering user; approvers are notified
 r.post('/', requirePerm('order.create'), async (req, res) => {
   const b = req.body || {};
   const lines = Array.isArray(b.lines) ? b.lines : [];
@@ -115,7 +115,8 @@ r.post('/', requirePerm('order.create'), async (req, res) => {
       if (item.kind === 'asset' && qty > 200) throw bad(`รายการที่ ${i + 1}: อุปกรณ์รายชิ้นสั่งได้ไม่เกิน 200 เครื่องต่อรายการ`);
       return { ...item, qty };
     });
-    const who = await resolveRecipient(req, { person_name: b.person_name || req.user.full_name, department_name: b.department_name });
+    // The recipient is always the person ordering (their แผนก comes from พนักงาน when known).
+    const who = await resolveRecipient(req, { person_name: req.user.full_name });
     const order_no = await nextOrderNo();
     const id = Number((await run('INSERT INTO orders (order_no, person_id, department_id, note, requested_by) VALUES (?, ?, ?, ?, ?)',
       order_no, who.person_id, who.department_id, b.note, req.user.id)).lastInsertRowid);
@@ -124,6 +125,12 @@ r.post('/', requirePerm('order.create'), async (req, res) => {
         id, l.kind, l.consumable_id, l.category_id, l.name, l.brand, l.model, l.qty, l.last_price);
     }
     await audit(req, 'order', id, 'create', null, { order_no, lines: clean.length });
+    const units = clean.reduce((s, l) => s + l.qty, 0);
+    const approvers = await all(`SELECT u.id FROM users u JOIN role_permissions rp ON rp.role_id = u.role_id
+      WHERE rp.perm_key = 'order.manage' AND u.is_active = 1 AND u.deleted_at IS NULL ORDER BY u.id`);
+    for (const a of approvers) {
+      await notify(req, a.id, { kind: 'order.submitted', title: `รายการสั่งซื้อใหม่ ${order_no} รออนุมัติ`, body: `${req.user.full_name} · ${clean.length} รายการ ${units} หน่วย`, link: `/orders/${id}` });
+    }
     return { id, order_no };
   });
   res.status(201).json(result);
@@ -145,9 +152,11 @@ r.get('/:id', ANY, async (req, res) => {
   const order = await loadOrder(req, req.params.id);
   const items = new Map((await catalog()).map((x) => [x.key, x]));
   const lines = (await all(`SELECT l.*, k.name AS category_name, c.sku AS code, c.unit, c.image_path,
-           pr.status AS receipt_status, pr.qty AS receipt_qty, pr.doc_id AS receipt_doc_id, d.doc_no AS receipt_doc_no
+           pr.status AS receipt_status, pr.qty AS receipt_qty, pr.doc_id AS receipt_doc_id, d.doc_no AS receipt_doc_no,
+           pr.po_id, po.po_no
     FROM order_lines l LEFT JOIN categories k ON k.id = l.category_id LEFT JOIN consumables c ON c.id = l.consumable_id
     LEFT JOIN pending_receipts pr ON pr.order_line_id = l.id AND pr.deleted_at IS NULL LEFT JOIN documents d ON d.id = pr.doc_id
+    LEFT JOIN purchase_orders po ON po.id = pr.po_id
     WHERE l.order_id = ? ORDER BY l.id`, order.id)).map((l) => {
     const s = items.get(keyOf(l));
     return { ...l, unit: l.unit || 'เครื่อง', image_path: l.image_path || s?.image_path || null, on_hand: s?.on_hand ?? 0 };
@@ -160,18 +169,18 @@ r.post('/:id/cancel', ANY, async (req, res) => {
   await tx(async () => {
     const o = await loadOrder(req, req.params.id);
     if (o.status !== 'pending' && !(o.status === 'approved' && can(req.user, 'order.manage'))) {
-      throw bad('ยกเลิกได้เฉพาะใบสั่งซื้อที่รอตรวจสอบ หรืออนุมัติแล้วแต่ยังไม่รับเข้า');
+      throw bad('ยกเลิกได้เฉพาะรายการสั่งซื้อที่รอตรวจสอบ หรืออนุมัติแล้วแต่ยังไม่รับเข้า');
     }
     if (o.status === 'approved') {
       if ((await get(`SELECT COUNT(*) n FROM (${RECEIPTS} AND ol.order_id = ? AND pr.status = 'received') x`, o.id)).n) {
-        throw bad('บางรายการรับเข้าสต็อกแล้ว ยกเลิกใบสั่งซื้อไม่ได้ — ยกเลิกรายการที่เหลือได้ที่เมนู “รอรับเข้า”');
+        throw bad('บางรายการรับเข้าสต็อกแล้ว ยกเลิกรายการสั่งซื้อไม่ได้ — ยกเลิกรายการที่เหลือได้ที่เมนู “รอรับเข้า”');
       }
       await run(`UPDATE pending_receipts SET status = 'cancelled', closed_by = ?, closed_at = ?
         WHERE status = 'pending' AND order_line_id IN (SELECT id FROM order_lines WHERE order_id = ?)`, req.user.id, now(), o.id);
     }
     await run(`UPDATE orders SET status = 'cancelled', cancelled_at = ? WHERE id = ?`, now(), o.id);
     await audit(req, 'order', o.id, 'cancel', { status: o.status }, { status: 'cancelled', reason: req.body?.reason || null });
-    await notify(req, o.requested_by, { kind: 'order.cancelled', title: `ใบสั่งซื้อ ${o.order_no} ถูกยกเลิก`, body: `โดย ${req.user.full_name}`, link: `/orders/${o.id}` });
+    await notify(req, o.requested_by, { kind: 'order.cancelled', title: `รายการสั่งซื้อ ${o.order_no} ถูกยกเลิก`, body: `โดย ${req.user.full_name}`, link: `/orders/${o.id}` });
   });
   res.json({ ok: true });
 });
@@ -191,10 +200,10 @@ r.post('/:id/handover', requirePerm('order.manage'), async (req, res) => {
     if ((Array.isArray(b.lines) ? b.lines : []).some((l) => l.kind === 'asset') && !can(req.user, 'asset.transact')) {
       throw new HttpError(403, 'คุณไม่มีสิทธิ์เบิกอุปกรณ์รายชิ้น');
     }
-    const doc = await createIssueDoc(req, { ...b, mode: 'issue', note: b.note || `ส่งมอบตามใบสั่งซื้อ ${o.order_no}` });
+    const doc = await createIssueDoc(req, { ...b, mode: 'issue', note: b.note || `ส่งมอบตามรายการสั่งซื้อ ${o.order_no}` });
     await run(`UPDATE orders SET status = 'delivered', delivered_by = ?, delivered_at = ?, doc_id = ? WHERE id = ?`, req.user.id, now(), doc.id, o.id);
     await audit(req, 'order', o.id, 'deliver', { status: 'approved' }, { status: 'delivered', doc_no: doc.doc_no });
-    await notify(req, o.requested_by, { kind: 'order.delivered', title: `ส่งมอบของตามใบสั่งซื้อ ${o.order_no} แล้ว`, body: `ใบเบิก ${doc.doc_no}`, link: `/orders/${o.id}` });
+    await notify(req, o.requested_by, { kind: 'order.delivered', title: `ส่งมอบของตามรายการสั่งซื้อ ${o.order_no} แล้ว`, body: `ใบเบิก ${doc.doc_no}`, link: `/orders/${o.id}` });
     return doc;
   });
   res.status(201).json(result);
@@ -204,7 +213,7 @@ r.post('/:id/handover', requirePerm('order.manage'), async (req, res) => {
 r.post('/:id/approve', requirePerm('order.manage'), async (req, res) => {
   await tx(async () => {
     const o = await loadOrder(req, req.params.id);
-    if (o.status !== 'pending') throw bad('อนุมัติได้เฉพาะใบสั่งซื้อที่รอตรวจสอบ');
+    if (o.status !== 'pending') throw bad('อนุมัติได้เฉพาะรายการสั่งซื้อที่รอตรวจสอบ');
     const lines = await all('SELECT * FROM order_lines WHERE order_id = ? ORDER BY id', o.id);
     const given = new Map((Array.isArray(req.body?.lines) ? req.body.lines : []).map((l) => [toInt(l.id), l.approved_qty]));
     let total = 0;
@@ -218,7 +227,7 @@ r.post('/:id/approve', requirePerm('order.manage'), async (req, res) => {
     }
     if (!total) throw bad('ต้องอนุมัติอย่างน้อย 1 รายการ — ถ้าไม่อนุมัติทั้งหมด ให้กด “ไม่อนุมัติ”');
     await run(`UPDATE orders SET status = 'approved', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE id = ?`, req.user.id, now(), req.body?.review_note || null, o.id);
-    const batch = Number((await run('INSERT INTO pending_batches (note, created_by) VALUES (?, ?)', `ใบสั่งซื้อ ${o.order_no}`, req.user.id)).lastInsertRowid);
+    const batch = Number((await run('INSERT INTO pending_batches (note, created_by) VALUES (?, ?)', `รายการสั่งซื้อ ${o.order_no}`, req.user.id)).lastInsertRowid);
     const approved = await all(`SELECT l.*, c.sku FROM order_lines l LEFT JOIN consumables c ON c.id = l.consumable_id
       WHERE l.order_id = ? AND l.approved_qty > 0 ORDER BY l.id`, o.id);
     for (const [i, l] of approved.entries()) {
@@ -227,7 +236,7 @@ r.post('/:id/approve', requirePerm('order.manage'), async (req, res) => {
     }
     await audit(req, 'order', o.id, 'approve', { status: 'pending' }, { status: 'approved', units: total, pending_batch: batch });
     await notify(req, o.requested_by, {
-      kind: 'order.approved', title: `อนุมัติใบสั่งซื้อ ${o.order_no} แล้ว`, link: `/orders/${o.id}`,
+      kind: 'order.approved', title: `อนุมัติรายการสั่งซื้อ ${o.order_no} แล้ว`, link: `/orders/${o.id}`,
       body: [total < asked ? `อนุมัติ ${total} จาก ${asked} หน่วย` : 'อนุมัติครบทุกรายการ', 'รอของเข้า', req.body?.review_note].filter(Boolean).join(' · '),
     });
   });
@@ -239,10 +248,10 @@ r.post('/:id/reject', requirePerm('order.manage'), async (req, res) => {
   if (!note) throw bad('กรุณาระบุเหตุผลที่ไม่อนุมัติ');
   await tx(async () => {
     const o = await loadOrder(req, req.params.id);
-    if (o.status !== 'pending') throw bad('ไม่อนุมัติได้เฉพาะใบสั่งซื้อที่รอตรวจสอบ');
+    if (o.status !== 'pending') throw bad('ไม่อนุมัติได้เฉพาะรายการสั่งซื้อที่รอตรวจสอบ');
     await run(`UPDATE orders SET status = 'rejected', reviewed_by = ?, reviewed_at = ?, review_note = ? WHERE id = ?`, req.user.id, now(), note, o.id);
     await audit(req, 'order', o.id, 'reject', { status: 'pending' }, { status: 'rejected', review_note: note });
-    await notify(req, o.requested_by, { kind: 'order.rejected', title: `ไม่อนุมัติใบสั่งซื้อ ${o.order_no}`, body: `เหตุผล: ${note}`, link: `/orders/${o.id}` });
+    await notify(req, o.requested_by, { kind: 'order.rejected', title: `ไม่อนุมัติรายการสั่งซื้อ ${o.order_no}`, body: `เหตุผล: ${note}`, link: `/orders/${o.id}` });
   });
   res.json({ ok: true });
 });

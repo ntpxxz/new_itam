@@ -28,13 +28,13 @@ export default function Issue() {
   const canCons = can('consumable.move');
   const canAsset = can('asset.transact');
 
-  // ?order=<id>: hand over a received ใบสั่งซื้อ — recipient and lines come from the order, still editable here.
+  // ?order=<id>: hand over a received รายการสั่งซื้อ — recipient and lines come from the order, still editable here.
   useEffect(() => {
     if (!orderId) return;
     api.get(`/api/orders/${orderId}/handover`).then((d) => {
       setOrder(d);
       setWho({ person_name: d.order.person_name, department_name: d.order.department_name });
-      setHead((h) => ({ ...h, mode: 'issue', note: `ส่งมอบตามใบสั่งซื้อ ${d.order.order_no}` }));
+      setHead((h) => ({ ...h, mode: 'issue', note: `ส่งมอบตามรายการสั่งซื้อ ${d.order.order_no}` }));
       setLines(d.items.map((x) => ({ key: seq++, item: x.item, qty: x.qty })));
     }).catch((e) => { toast.error(e); navigate(`/orders/${orderId}`, { replace: true }); });
   }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -91,8 +91,8 @@ export default function Issue() {
   return (
     <>
       <PageHeader title={order ? `ส่งมอบ ${order.order.order_no}` : 'เบิกออก'}
-        sub={order ? 'ใบเบิกสำหรับส่งมอบของตามใบสั่งซื้อ — ตรวจรายการและผู้รับ แล้วบันทึก ใบสั่งซื้อจะเป็น “ส่งมอบแล้ว”' : 'จ่ายอุปกรณ์ให้พนักงานหรือส่วนงานเป็นใบเบิก — สแกนหลายชิ้นต่อกันได้ บันทึกพร้อมกันทั้งใบ'}
-        crumbs={order ? [{ label: 'ใบสั่งซื้อ', to: '/orders' }, { label: order.order.order_no, to: `/orders/${order.order.id}` }, { label: 'ส่งมอบ' }] : undefined}>
+        sub={order ? 'ใบเบิกสำหรับส่งมอบของตามรายการสั่งซื้อ — ตรวจรายการและผู้รับ แล้วบันทึก รายการสั่งซื้อจะเป็น “ส่งมอบแล้ว”' : 'จ่ายอุปกรณ์ให้พนักงานหรือส่วนงานเป็นใบเบิก — สแกนหลายชิ้นต่อกันได้ บันทึกพร้อมกันทั้งใบ'}
+        crumbs={order ? [{ label: 'รายการสั่งซื้อ', to: '/orders' }, { label: order.order.order_no, to: `/orders/${order.order.id}` }, { label: 'ส่งมอบ' }] : undefined}>
         <button className="btn btn-primary" onClick={submit} disabled={busy || !lines.length || (orderId && !order)}>
           {order ? <PackageCheck size={16} /> : <Save size={16} />}
           {busy ? 'กำลังบันทึก…' : `${order ? 'บันทึกส่งมอบ' : 'บันทึกเบิกออก'}${lines.length ? ` (${lines.length} รายการ)` : ''}`}
@@ -103,7 +103,7 @@ export default function Issue() {
         <div className="alert">
           <PackageMinus size={18} />
           <span className="alert-detail">
-            ของบางรายการไม่ครบตามใบสั่งซื้อ — {order.short.join(' · ')}. ส่งมอบเท่าที่มีได้ หรือ <Link to={`/orders/${order.order.id}`}>กลับไปที่ใบสั่งซื้อ</Link>
+            ของบางรายการไม่ครบตามรายการสั่งซื้อ — {order.short.join(' · ')}. ส่งมอบเท่าที่มีได้ หรือ <Link to={`/orders/${order.order.id}`}>กลับไปที่รายการสั่งซื้อ</Link>
           </span>
         </div>
       )}
@@ -114,7 +114,7 @@ export default function Issue() {
             hint={head.doc_date && head.doc_date < todayISO() ? `บันทึกย้อนหลัง ${-daysFromToday(head.doc_date)} วัน` : 'เลือกวันที่ย้อนหลังได้ หากเบิกไปก่อนแล้วมาบันทึกภายหลัง'}>
             <input type="date" className="input" value={head.doc_date} max={todayISO()} onChange={setH('doc_date')} />
           </Field>
-          {order ? <Field label="ประเภทการเบิก" hint="ส่งมอบตามใบสั่งซื้อเป็นการเบิกถาวรเสมอ"><input className="input" value="เบิกออก (ถาวร)" disabled aria-label="ประเภทการเบิก" /></Field> : <Field label="ประเภทการเบิก" hint={head.mode === 'borrow' ? 'อุปกรณ์รายชิ้นจะเป็นสถานะ “ถูกยืม” และต้องคืนตามกำหนด' : 'อุปกรณ์รายชิ้นจะเป็นสถานะ “เบิกถาวร”'}>
+          {order ? <Field label="ประเภทการเบิก" hint="ส่งมอบตามรายการสั่งซื้อเป็นการเบิกถาวรเสมอ"><input className="input" value="เบิกออก (ถาวร)" disabled aria-label="ประเภทการเบิก" /></Field> : <Field label="ประเภทการเบิก" hint={head.mode === 'borrow' ? 'อุปกรณ์รายชิ้นจะเป็นสถานะ “ถูกยืม” และต้องคืนตามกำหนด' : 'อุปกรณ์รายชิ้นจะเป็นสถานะ “เบิกถาวร”'}>
             <div className="seg" role="group" aria-label="ประเภทการเบิก">
               <button type="button" aria-pressed={head.mode === 'issue'} onClick={() => setH('mode')('issue')}>เบิกออก (ถาวร)</button>
               <button type="button" aria-pressed={head.mode === 'borrow'} onClick={() => setH('mode')('borrow')}>ยืม (มีกำหนดคืน)</button>

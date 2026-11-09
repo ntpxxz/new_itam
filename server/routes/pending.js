@@ -11,7 +11,7 @@ import { notify } from '../notify.js';
 // history and audit follow the same rules as the รับเข้า page. Lines match items by SKU at read time.
 // Incomplete lines (no SKU / quantity) are kept too, so they can be fixed on the page instead of re-uploading.
 // ลบ = soft delete (deleted_at): the line disappears from every tab; received lines belong to a slip and stay.
-// Approved ใบสั่งซื้อ lines land here too (order_line_id): consumables match by SKU like any line; per-unit asset
+// Approved รายการสั่งซื้อ lines land here too (order_line_id): consumables match by SKU like any line; per-unit asset
 // lines have no SKU and create new asset units (category/name/brand/model from the order line) when received.
 const r = Router();
 
@@ -22,7 +22,7 @@ const LIST = `
          b.file_name, b.note AS batch_note, u.full_name AS created_by_name, cu.full_name AS closed_by_name, d.doc_no,
          x.id AS item_id, x.name AS item_name, x.unit, x.qty_on_hand, x.unit_cost AS item_unit_cost, p.order_line_id,
          ol.kind AS order_kind, ol.category_id AS order_category_id, ol.brand AS order_brand, ol.model AS order_model,
-         o.id AS order_id, o.order_no,
+         o.id AS order_id, o.order_no, p.po_id, po.po_no, po.vendor_id AS po_vendor_id,
          CASE WHEN x.id IS NULL AND EXISTS (SELECT 1 FROM assets a WHERE (a.asset_tag = p.sku COLLATE NOCASE OR a.serial_no = p.sku) AND a.deleted_at IS NULL)
               THEN 1 ELSE 0 END AS is_asset
   FROM pending_receipts p
@@ -31,7 +31,8 @@ const LIST = `
   LEFT JOIN users cu ON cu.id = p.closed_by
   LEFT JOIN documents d ON d.id = p.doc_id
   LEFT JOIN order_lines ol ON ol.id = p.order_line_id
-  LEFT JOIN orders o ON o.id = ol.order_id ${MATCH}`;
+  LEFT JOIN orders o ON o.id = ol.order_id
+  LEFT JOIN purchase_orders po ON po.id = p.po_id AND po.status = 'open' ${MATCH}`;
 
 const STATUSES = ['pending', 'received', 'cancelled'];
 const SKU_RULE = 'SKU ต้องไม่มีช่องว่าง และยาวไม่เกิน 64 ตัวอักษร';
@@ -52,13 +53,14 @@ const idList = (ids) => [...new Set((Array.isArray(ids) ? ids : []).map(Number).
 
 r.get('/', requirePerm('consumable.view'), async (req, res) => {
   const status = STATUSES.includes(req.query.status) ? req.query.status : 'pending';
-  const w = ['p.status = ?', 'p.deleted_at IS NULL']; const p = [status];
+  // Approved order lines show up here only once they are on a ใบสั่งซื้อ (po_id); until then they wait on /orders?status=items.
+  const w = ['p.status = ?', 'p.deleted_at IS NULL', "(p.order_line_id IS NULL OR p.po_id IS NOT NULL OR p.status <> 'pending')"]; const p = [status];
   if (req.query.q) {
-    w.push(`(p.sku LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR x.name LIKE ? ESCAPE '\\' OR b.file_name LIKE ? ESCAPE '\\' OR o.order_no LIKE ? ESCAPE '\\')`);
-    p.push(...Array(5).fill(likeTerm(req.query.q)));
+    w.push(`(p.sku LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR x.name LIKE ? ESCAPE '\\' OR b.file_name LIKE ? ESCAPE '\\' OR o.order_no LIKE ? ESCAPE '\\' OR po.po_no LIKE ? ESCAPE '\\')`);
+    p.push(...Array(6).fill(likeTerm(req.query.q)));
   }
   const rows = (await all(`${LIST} WHERE ${w.join(' AND ')} ORDER BY p.batch_id DESC, p.line_no, p.id LIMIT 2000`, ...p)).map(withState);
-  const counts = Object.fromEntries((await all('SELECT status, COUNT(*) n FROM pending_receipts WHERE deleted_at IS NULL GROUP BY status')).map((c) => [c.status, c.n]));
+  const counts = Object.fromEntries((await all(`SELECT status, COUNT(*) n FROM pending_receipts WHERE deleted_at IS NULL AND (order_line_id IS NULL OR po_id IS NOT NULL OR status <> 'pending') GROUP BY status`)).map((c) => [c.status, c.n]));
   res.json({ rows, counts });
 });
 
@@ -104,7 +106,7 @@ r.put('/:id', requirePerm('consumable.move'), async (req, res) => {
   if (before.status !== 'pending') throw bad('รายการนี้รับเข้าหรือยกเลิกไปแล้ว แก้ไขไม่ได้');
   const body = req.body || {};
   const v = { sku: before.sku, name: before.name, qty: before.qty, unit_cost: before.unit_cost };
-  if (body.sku !== undefined && before.order_line_id) throw bad('รายการจากใบสั่งซื้อแก้บาร์โค้ด/SKU ไม่ได้ — แก้ได้เฉพาะจำนวนและราคา');
+  if (body.sku !== undefined && before.order_line_id) throw bad('แถวที่มาจากรายการสั่งซื้อแก้บาร์โค้ด/SKU ไม่ได้ — แก้ได้เฉพาะจำนวนและราคา');
   if (body.sku !== undefined) {
     v.sku = String(body.sku ?? '').trim();
     if (!v.sku) throw bad('กรุณากรอกบาร์โค้ด/SKU');
@@ -134,6 +136,8 @@ async function loadPending(ids) {
   if (rows.length !== ids.length || rows.some((x) => x.status !== 'pending' || x.deleted_at)) {
     throw bad('บางรายการถูกรับเข้าหรือยกเลิกไปแล้ว — โหลดหน้าใหม่แล้วลองอีกครั้ง');
   }
+  const noPo = rows.find((x) => x.order_line_id && !x.po_id);
+  if (noPo) throw bad(`${noPo.name} (${noPo.order_no}) ยังไม่ได้ออกใบสั่งซื้อ — ออกใบสั่งซื้อที่ รายการสั่งซื้อ › รอออกใบสั่งซื้อ ก่อน`);
   return rows.map(withState);
 }
 
@@ -153,9 +157,11 @@ r.post('/receive', requirePerm('consumable.move'), async (req, res) => {
     }
     const sources = [...new Set(rows.map((x) => x.order_no || x.file_name).filter(Boolean))];
     const orders = [...new Set(rows.map((x) => x.order_no).filter(Boolean))];
+    const pos = [...new Set(rows.map((x) => x.po_no || null))];
+    const po = pos.length === 1 && pos[0] ? rows[0] : null;
     const doc = await createReceiveDoc(req, {
-      doc_date: b.doc_date, vendor_id: b.vendor_id, location_id: b.location_id, invoice_number: b.invoice_number,
-      po_number: b.po_number || (orders.length === 1 ? orders[0] : null),
+      doc_date: b.doc_date, vendor_id: b.vendor_id || po?.po_vendor_id, location_id: b.location_id, invoice_number: b.invoice_number,
+      po_number: b.po_number || po?.po_no || (orders.length === 1 ? orders[0] : null),
       note: b.note || (sources.length ? `จากรายการรอรับเข้า: ${sources.join(', ')}` : 'จากรายการรอรับเข้า'),
       lines: rows.map((x) => (x.order_kind === 'asset'
         ? { kind: 'asset', category_id: x.order_category_id, name: x.name, brand: x.order_brand || null, model: x.order_model || null, qty: x.qty, unit_price: x.unit_cost }
@@ -171,7 +177,7 @@ r.post('/receive', requirePerm('consumable.move'), async (req, res) => {
         FROM orders o WHERE o.id = ?`, orderId);
       const n = rows.filter((x) => x.order_id === orderId).length;
       await notify(req, o.requested_by, {
-        kind: 'order.received', title: `ของตามใบสั่งซื้อ ${o.order_no} เข้าสต็อกแล้ว`, link: `/orders/${o.id}`,
+        kind: 'order.received', title: `ของตามรายการสั่งซื้อ ${o.order_no} เข้าสต็อกแล้ว`, link: `/orders/${o.id}`,
         body: o.waiting ? `รับเข้า ${n} รายการ · ยังรออีก ${o.waiting} รายการ` : `รับเข้าครบแล้ว · รอส่งมอบ`,
       });
     }

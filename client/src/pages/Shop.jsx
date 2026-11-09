@@ -36,9 +36,7 @@ export default function Shop() {
 
   return (
     <>
-      <PageHeader title="สั่งซื้อสินค้า" sub="เลือกสินค้าที่ลงทะเบียนไว้ใส่ตะกร้า (สั่งได้แม้สต็อกเป็น 0) แล้วไปที่ตะกร้าเพื่อส่งใบสั่งซื้อ — ผู้ดูแลจะอนุมัติ รับของ และส่งมอบให้">
-        <Link to="/cart" className="btn btn-primary"><ShoppingCart size={16} />ดูตะกร้า{cart.length ? ` (${cart.length})` : ''}</Link>
-      </PageHeader>
+      <PageHeader title="สั่งซื้อสินค้า" sub="เลือกสินค้าที่ลงทะเบียนไว้ใส่ตะกร้า (สั่งได้แม้สต็อกเป็น 0) แล้วไปที่ตะกร้าเพื่อส่งรายการสั่งซื้อ — ผู้ดูแลจะอนุมัติ รับของ และส่งมอบให้" />
       <div className="two-col shop-layout">
         <Card noBody>
           <div className="toolbar">
@@ -86,7 +84,7 @@ export default function Shop() {
 
         <div className="shop-cart">
           <Card title={<span className="row" style={{ gap: 8 }}><ShoppingCart size={16} aria-hidden />ตะกร้า{cart.length ? ` (${cart.length})` : ''}</span>}
-            foot={cart.length > 0 && <Link to="/cart" className="btn" style={{ width: '100%' }}>ไปที่ตะกร้า · {fmtNum(units)} หน่วย</Link>}>
+            foot={cart.length > 0 && <div className="card-actions"><Link to="/cart" className="btn">ไปที่ตะกร้า · {fmtNum(units)} หน่วย</Link></div>}>
             {!cart.length ? <p className="field-hint">ยังไม่มีสินค้า — กด “ใส่ตะกร้า” ที่สินค้าที่ต้องการ</p> : (
               <div className="stack" style={{ gap: 10 }}>
                 {cart.map((l) => {

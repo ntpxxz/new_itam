@@ -205,7 +205,8 @@ CREATE TABLE pending_receipts (
   closed_by   INTEGER REFERENCES users(id),
   closed_at   TEXT,
   deleted_at  TEXT,
-  order_line_id INTEGER REFERENCES order_lines(id)
+  order_line_id INTEGER REFERENCES order_lines(id),
+  po_id       INTEGER REFERENCES purchase_orders(id)
 );
 
 CREATE TABLE people (
@@ -220,6 +221,19 @@ CREATE TABLE permissions (
   key   TEXT PRIMARY KEY,
   name  TEXT NOT NULL,
   grp   TEXT NOT NULL
+);
+
+CREATE TABLE purchase_orders (
+  id           INTEGER PRIMARY KEY,
+  po_no        TEXT UNIQUE NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','cancelled')),
+  doc_date     TEXT NOT NULL,
+  vendor_id    INTEGER NOT NULL REFERENCES vendors(id),
+  note         TEXT,
+  created_by   INTEGER NOT NULL REFERENCES users(id),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  cancelled_by INTEGER REFERENCES users(id),
+  cancelled_at TEXT
 );
 
 CREATE TABLE role_permissions (
@@ -325,6 +339,7 @@ CREATE INDEX idx_notifications_user ON notifications(user_id, id);
 CREATE INDEX idx_order_lines ON order_lines(order_id);
 CREATE INDEX idx_orders_status ON orders(status, id);
 CREATE INDEX idx_orders_user ON orders(requested_by, id);
+CREATE INDEX idx_pending_po ON pending_receipts(po_id) WHERE po_id IS NOT NULL;
 CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);
 CREATE INDEX idx_sm_cons ON stock_movements(consumable_id, created_at);
 CREATE INDEX idx_sm_doc ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;

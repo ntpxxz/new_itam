@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-do
 import {
   LayoutDashboard, Laptop, ArrowLeftRight, History, PackagePlus, PackageMinus, BarChart3, ScanLine, Printer, ClipboardCheck, FileSpreadsheet,
   Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, Search, LogOut, KeyRound, Boxes,
-  ClipboardList, ShoppingCart, ReceiptText,
+  ClipboardList, ShoppingCart, ReceiptText, FileText,
 } from 'lucide-react';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
@@ -30,7 +30,8 @@ const NAV = [
     label: 'สั่งซื้อ',
     items: [
       { to: '/shop', label: 'สั่งซื้อสินค้า', icon: ShoppingCart, perm: 'order.create' },
-      { to: '/orders', label: 'ใบสั่งซื้อ', icon: ReceiptText, perm: ['order.create', 'order.manage'], badge: 'pendingOrders' },
+      { to: '/orders', label: 'รายการสั่งซื้อ', icon: ReceiptText, perm: ['order.create', 'order.manage'], badge: 'pendingOrders' },
+      { to: '/purchase-orders', label: 'ใบสั่งซื้อ', icon: FileText, perm: 'order.manage' },
     ],
   },
   {
@@ -127,7 +128,7 @@ export default function Layout() {
                     <span>{i.label}</span>
                     {i.badge && badges[i.badge] > 0 && (
                       <span className={`nav-badge${i.badge === 'lowStock' ? ' warn' : ''}`}
-                        aria-label={{ overdue: `เกินกำหนดคืน ${badges.overdue} รายการ`, lowStock: `สต็อกต่ำ ${badges.lowStock} รายการ`, pendingReceive: `รอรับเข้า ${badges.pendingReceive} รายการ`, pendingOrders: `ใบสั่งซื้อรอดำเนินการ ${badges.pendingOrders} รายการ` }[i.badge]}>
+                        aria-label={{ overdue: `เกินกำหนดคืน ${badges.overdue} รายการ`, lowStock: `สต็อกต่ำ ${badges.lowStock} รายการ`, pendingReceive: `รอรับเข้า ${badges.pendingReceive} รายการ`, pendingOrders: `รายการสั่งซื้อรอดำเนินการ ${badges.pendingOrders} รายการ` }[i.badge]}>
                         {badges[i.badge]}
                       </span>
                     )}

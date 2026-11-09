@@ -75,7 +75,7 @@ r.get('/badges', requireAuth, async (req, res) => {
   res.json({
     overdue: can(req.user, 'asset.view') ? (await get(`SELECT COUNT(*) n FROM assets WHERE deleted_at IS NULL AND status='borrowed' AND due_date < ?`, today())).n : 0,
     lowStock: can(req.user, 'consumable.view') ? (await get('SELECT COUNT(*) n FROM consumables WHERE deleted_at IS NULL AND qty_on_hand <= reorder_point')).n : 0,
-    pendingReceive: can(req.user, 'consumable.view') ? (await get(`SELECT COUNT(*) n FROM pending_receipts WHERE status = 'pending' AND deleted_at IS NULL`)).n : 0,
+    pendingReceive: can(req.user, 'consumable.view') ? (await get(`SELECT COUNT(*) n FROM pending_receipts WHERE status = 'pending' AND deleted_at IS NULL AND (order_line_id IS NULL OR po_id IS NOT NULL)`)).n : 0,
     // Purchase orders waiting for approval (approved lines are counted in pendingReceive).
     pendingOrders: can(req.user, 'order.manage') ? (await get(`SELECT COUNT(*) n FROM orders WHERE status = 'pending'`)).n : 0,
     notifications: (await get('SELECT COUNT(*) n FROM notifications WHERE user_id = ? AND read_at IS NULL', req.user.id)).n,

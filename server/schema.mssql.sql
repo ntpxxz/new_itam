@@ -290,6 +290,20 @@ CREATE TABLE order_lines (
   unit_price    DECIMAL(14,2) NULL
 );
 
+IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NULL
+CREATE TABLE purchase_orders (
+  id           INT IDENTITY(1,1) PRIMARY KEY,
+  po_no        NVARCHAR(30) NOT NULL UNIQUE,
+  status       NVARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open','cancelled')),
+  doc_date     DATE NOT NULL,
+  vendor_id    INT NOT NULL REFERENCES vendors(id),
+  note         NVARCHAR(MAX) NULL,
+  created_by   INT NOT NULL REFERENCES users(id),
+  created_at   DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
+  cancelled_by INT NULL REFERENCES users(id),
+  cancelled_at DATETIME2(0) NULL
+);
+
 IF OBJECT_ID(N'dbo.notifications', N'U') IS NULL
 CREATE TABLE notifications (
   id         INT IDENTITY(1,1) PRIMARY KEY,
@@ -354,12 +368,14 @@ GO
 IF COL_LENGTH(N'dbo.pending_receipts', N'deleted_at') IS NULL ALTER TABLE pending_receipts ADD deleted_at DATETIME2(0) NULL;
 IF COL_LENGTH(N'dbo.pending_receipts', N'order_line_id') IS NULL ALTER TABLE pending_receipts ADD order_line_id INT NULL REFERENCES order_lines(id);
 IF COL_LENGTH(N'dbo.order_lines', N'unit_price') IS NULL ALTER TABLE order_lines ADD unit_price DECIMAL(14,2) NULL;
+IF COL_LENGTH(N'dbo.pending_receipts', N'po_id') IS NULL ALTER TABLE pending_receipts ADD po_id INT NULL REFERENCES purchase_orders(id);
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_pending_status') CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_status') CREATE INDEX idx_orders_status ON orders(status, id);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_orders_user') CREATE INDEX idx_orders_user ON orders(requested_by, id);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_order_lines') CREATE INDEX idx_order_lines ON order_lines(order_id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_pending_po') CREATE INDEX idx_pending_po ON pending_receipts(po_id);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_notifications_user') CREATE INDEX idx_notifications_user ON notifications(user_id, id);
 GO
 

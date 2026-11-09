@@ -242,9 +242,25 @@ CREATE TABLE IF NOT EXISTS pending_receipts (
   closed_by   INTEGER REFERENCES users(id),
   closed_at   TEXT,
   deleted_at  TEXT,
-  order_line_id INTEGER REFERENCES order_lines(id)
+  order_line_id INTEGER REFERENCES order_lines(id),
+  po_id       INTEGER REFERENCES purchase_orders(id)
 );
 CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_receipts(status, batch_id);
+
+-- ใบ PO to a vendor: an admin picks approved ใบสั่งซื้อ lines still waiting in pending_receipts (one or many orders)
+-- and orders them from one vendor. The lines stay in รอรับเข้า (pending_receipts.po_id) and are received there.
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id           INTEGER PRIMARY KEY,
+  po_no        TEXT UNIQUE NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','cancelled')),
+  doc_date     TEXT NOT NULL,
+  vendor_id    INTEGER NOT NULL REFERENCES vendors(id),
+  note         TEXT,
+  created_by   INTEGER NOT NULL REFERENCES users(id),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  cancelled_by INTEGER REFERENCES users(id),
+  cancelled_at TEXT
+);
 
 -- ใบสั่งซื้อ: a user picks registered items (any stock level) into a cart and orders them (pending). An admin
 -- approves (may lower quantities) or rejects. Approving puts every approved line into pending_receipts

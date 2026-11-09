@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-// ใบสั่งซื้อ cart: [{ key, qty }] keyed by catalog item key, kept in localStorage and shared by
+// รายการสั่งซื้อ cart: [{ key, qty }] keyed by catalog item key, kept in localStorage and shared by
 // /shop, /cart and the topbar icon (same tab via listeners, other tabs via the storage event).
 const KEY = 'itam.cart';
 const listeners = new Set();

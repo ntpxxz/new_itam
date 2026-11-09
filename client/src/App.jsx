@@ -34,6 +34,9 @@ import Shop from './pages/Shop.jsx';
 import Cart from './pages/Cart.jsx';
 import Orders from './pages/Orders.jsx';
 import OrderDetail from './pages/OrderDetail.jsx';
+import PurchaseOrders from './pages/PurchaseOrders.jsx';
+import PurchaseOrderNew from './pages/PurchaseOrderNew.jsx';
+import PurchaseOrderDetail from './pages/PurchaseOrderDetail.jsx';
 
 function Guard({ perm, children }) {
   const { can } = useAuth();
@@ -89,6 +92,9 @@ export default function App() {
         <Route path="cart" element={g('order.create', <Cart />)} />
         <Route path="orders" element={g(['order.create', 'order.manage'], <Orders />)} />
         <Route path="orders/:id" element={g(['order.create', 'order.manage'], <OrderDetail />)} />
+        <Route path="purchase-orders" element={g('order.manage', <PurchaseOrders />)} />
+        <Route path="purchase-orders/new" element={g('order.manage', <PurchaseOrderNew />)} />
+        <Route path="purchase-orders/:id" element={g('order.manage', <PurchaseOrderDetail />)} />
         <Route path="reports/issues" element={g('report.view', <Reports />)} />
         <Route path="loans" element={g('loan.view', <Loans />)} />
         <Route path="consumables" element={<Navigate to="/assets" replace />} />
