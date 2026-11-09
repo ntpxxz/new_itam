@@ -35,7 +35,9 @@ img { max-width: 100%; display: block; }
   background: var(--bg-surface); border-right: 1px solid var(--border);
   display: flex; flex-direction: column; padding: 16px 12px;
 }
-.brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; }
+.brand-row { display: flex; align-items: flex-start; gap: 4px; padding-bottom: 18px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px; flex: 1; min-width: 0; }
+.nav-toggle { margin-top: 2px; }
 .brand-mark {
   width: 32px; height: 32px; border-radius: 8px; background: var(--brand); color: var(--text-on-brand);
   display: grid; place-items: center; flex: none;
@@ -48,7 +50,7 @@ img { max-width: 100%; display: block; }
   color: var(--text-subtle); padding: 0 10px 6px;
 }
 .nav-item {
-  display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 7px 10px; border-radius: var(--radius-sm);
+  position: relative; display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 7px 10px; border-radius: var(--radius-sm);
   color: var(--text-muted); font-size: 13.5px; transition: background-color 100ms linear, color 100ms linear;
 }
 .nav-item:hover { background: var(--bg-subtle); color: var(--text); text-decoration: none; }
@@ -73,20 +75,30 @@ img { max-width: 100%; display: block; }
 .topbar {
   position: sticky; top: 0; z-index: 20; height: var(--topbar-h);
   background: var(--bg-surface); border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 12px; padding: 0 24px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 480px) minmax(0, 1fr); align-items: center; gap: 12px; padding: 0 24px;
 }
-.topbar-search { flex: 1; max-width: 420px; position: relative; margin: 0 auto 0 0; }
+.topbar-start, .topbar-end { display: flex; align-items: center; gap: 12px; }
+.topbar-end { justify-content: flex-end; }
+.topbar-search { width: 100%; position: relative; }
 .topbar-search input { width: 100%; padding-right: 48px; }
 .kbd {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle);
   border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; background: var(--bg-subtle);
 }
-.hamburger { display: inline-grid; }
+.icon-btn.hamburger { display: none; }
+/* Collapsed sidebar = 64px icon rail; the toggle stays in it. */
 @media (min-width: 760px) {
   .shell { transition: grid-template-columns 200ms ease; }
-  .shell.nav-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
-  .shell.nav-collapsed .sidebar { visibility: hidden; padding-inline: 0; border-right: 0; overflow: hidden; }
+  .shell.nav-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
+  .shell.nav-collapsed .sidebar { padding-inline: 10px; overflow-x: hidden; }
+  .shell.nav-collapsed .brand-row { flex-direction: column; align-items: center; gap: 8px; }
+  .shell.nav-collapsed .brand { padding: 4px 0; flex: none; }
+  .shell.nav-collapsed .brand-text, .shell.nav-collapsed .nav-text, .shell.nav-collapsed .user-meta { display: none; }
+  .shell.nav-collapsed .nav-label { height: 1px; padding: 0; margin: 0 6px 8px; background: var(--border); overflow: hidden; color: transparent; }
+  .shell.nav-collapsed .nav-item { justify-content: center; padding-inline: 0; }
+  .shell.nav-collapsed .nav-badge { position: absolute; top: 2px; right: 2px; padding: 2px 4px; font-size: 9.5px; }
+  .shell.nav-collapsed .user-card { justify-content: center; padding: 6px 0; border-color: transparent; }
 }
 .content { width: 100%; max-width: 1440px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
 .scrim { display: none; }
@@ -126,7 +138,7 @@ img { max-width: 100%; display: block; }
 }
 .icon-btn:hover { background: var(--bg-subtle); color: var(--text); }
 .icon-btn.plain { border-color: transparent; background: transparent; }
-.icon-btn .count { position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--brand); color: var(--text-on-brand); font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; border: 2px solid var(--bg-surface); box-sizing: content-box; }
+.icon-btn .count { position: absolute; top: -7px; right: -8px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--brand); color: var(--text-on-brand); font-size: 10px; font-weight: 600; line-height: 16px; pointer-events: none; text-align: center; border: 2px solid var(--bg-surface); box-sizing: content-box; }
 .icon-btn .dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); border: 2px solid var(--bg-surface); }
 
 /* ---------- Inputs ---------- */
@@ -448,7 +460,10 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
   }
   .shell.nav-open .sidebar { transform: none; }
   .shell.nav-open .scrim { display: block; position: fixed; inset: 0; z-index: 80; background: var(--overlay); }
-  .topbar { padding: 0 16px; gap: 8px; }
+  .topbar { grid-template-columns: auto minmax(0, 1fr) auto; padding: 0 16px; gap: 8px; }
+  .topbar-start, .topbar-end { gap: 8px; }
+  .icon-btn.hamburger { display: inline-grid; }
+  .nav-toggle { display: none; }
   .content { padding: 16px; gap: 16px; }
   .kbd { display: none; }
   .form-grid { grid-template-columns: minmax(0, 1fr); }

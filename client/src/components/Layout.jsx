@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-do
 import {
   LayoutDashboard, Laptop, ArrowLeftRight, History, PackagePlus, PackageMinus, BarChart3, ScanLine, Printer, ClipboardCheck, FileSpreadsheet,
   Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, Search, LogOut, KeyRound, Boxes,
-  ClipboardList, ShoppingCart, ReceiptText, FileText,
+  ClipboardList, ShoppingCart, ReceiptText, FileText, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
@@ -65,7 +65,7 @@ export default function Layout() {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('navCollapsed') === '1'; } catch { return false; } });
   const toggleNav = () => {
-    if (window.matchMedia('(max-width: 759px)').matches) { setOpen(true); return; }
+    if (window.matchMedia('(max-width: 759px)').matches) { setOpen((o) => !o); return; }
     setCollapsed((c) => {
       try { localStorage.setItem('navCollapsed', c ? '0' : '1'); } catch { /* storage blocked */ }
       return !c;
@@ -108,13 +108,18 @@ export default function Layout() {
   return (
     <div className={`shell${open ? ' nav-open' : ''}${collapsed ? ' nav-collapsed' : ''}`}>
       <aside className="sidebar" aria-label="เมนูหลัก">
-        <Link to="/" className="brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <span className="brand-mark"><Boxes size={18} aria-hidden /></span>
-          <span>
-            <div className="brand-name">IT Store</div>
-            <div className="brand-sub">ระบบจัดการทรัพย์สินไอที</div>
-          </span>
-        </Link>
+        <div className="brand-row">
+          <Link to="/" className="brand" style={{ textDecoration: 'none', color: 'inherit' }} title="IT Store">
+            <span className="brand-mark"><Boxes size={18} aria-hidden /></span>
+            <span className="brand-text">
+              <div className="brand-name">IT Store</div>
+              <div className="brand-sub">ระบบจัดการทรัพย์สินไอที</div>
+            </span>
+          </Link>
+          <button className="icon-btn plain nav-toggle" onClick={toggleNav} aria-label={collapsed ? 'แสดงเมนู' : 'ซ่อนเมนู'} title={collapsed ? 'แสดงเมนู' : 'ซ่อนเมนู'}>
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+        </div>
         <nav>
           {NAV.map((sec) => {
             const items = sec.items.filter((i) => [i.perm].flat().some(can));
@@ -123,9 +128,9 @@ export default function Layout() {
               <div className="nav-section" key={sec.label}>
                 <div className="nav-label">{sec.label}</div>
                 {items.map((i) => (
-                  <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+                  <NavLink key={i.to} to={i.to} end={i.end} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} title={i.label}>
                     <i.icon size={16} aria-hidden />
-                    <span>{i.label}</span>
+                    <span className="nav-text">{i.label}</span>
                     {i.badge && badges[i.badge] > 0 && (
                       <span className={`nav-badge${i.badge === 'lowStock' ? ' warn' : ''}`}
                         aria-label={{ overdue: `เกินกำหนดคืน ${badges.overdue} รายการ`, lowStock: `สต็อกต่ำ ${badges.lowStock} รายการ`, pendingReceive: `รอรับเข้า ${badges.pendingReceive} รายการ`, pendingOrders: `รายการสั่งซื้อรอดำเนินการ ${badges.pendingOrders} รายการ` }[i.badge]}>
@@ -152,9 +157,11 @@ export default function Layout() {
 
       <div className="main-col">
         <header className="topbar">
-          <button className="icon-btn hamburger" onClick={toggleNav} aria-label="แสดง/ซ่อนเมนู" title="แสดง/ซ่อนเมนู">
-            <MenuIcon size={18} />
-          </button>
+          <div className="topbar-start">
+            <button className="icon-btn hamburger" onClick={() => setOpen(true)} aria-label="แสดงเมนู" title="แสดงเมนู">
+              <MenuIcon size={18} />
+            </button>
+          </div>
           {can('asset.view') || can('consumable.view') ? (
             <form className="topbar-search input-icon" onSubmit={submitSearch} role="search">
               <Search size={16} aria-hidden />
@@ -162,25 +169,27 @@ export default function Layout() {
                 placeholder="ค้นหารหัสทรัพย์สิน, Serial, ชื่อ, ผู้ถือครอง" aria-label="ค้นหาอุปกรณ์" />
               <span className="kbd" aria-hidden>{isMac ? '⌘K' : 'Ctrl K'}</span>
             </form>
-          ) : <div className="spacer" />}
-          {can('order.create') && (
-            <Link to="/cart" className="icon-btn" aria-label={cart.length ? `ตะกร้า ${cart.length} รายการ` : 'ตะกร้า'} title="ตะกร้า">
-              <ShoppingCart size={18} />{cart.length > 0 && <span className="count mono" aria-hidden>{cart.length}</span>}
-            </Link>
-          )}
-          {can('asset.view') && (
-            <Link to="/scan" className="icon-btn" aria-label="สแกน QR" title="สแกน QR"><ScanLine size={18} /></Link>
-          )}
-          <NotificationBell badges={badges} onChange={loadBadges} />
-          <Menu
-            label="บัญชีผู้ใช้"
-            icon={<span className="avatar" style={{ width: 30, height: 30, fontSize: 12 }}>{initials(user.full_name)}</span>}
-            items={[
-              { label: 'เปลี่ยนรหัสผ่าน', to: '/profile', icon: <KeyRound size={15} /> },
-              '-',
-              { label: 'ออกจากระบบ', onClick: logout, icon: <LogOut size={15} />, danger: true },
-            ]}
-          />
+          ) : <div />}
+          <div className="topbar-end">
+            {can('order.create') && (
+              <Link to="/cart" className="icon-btn" aria-label={cart.length ? `ตะกร้า ${cart.length} รายการ` : 'ตะกร้า'} title="ตะกร้า">
+                <ShoppingCart size={18} />{cart.length > 0 && <span className="count mono" aria-hidden>{cart.length}</span>}
+              </Link>
+            )}
+            {can('asset.view') && (
+              <Link to="/scan" className="icon-btn" aria-label="สแกน QR" title="สแกน QR"><ScanLine size={18} /></Link>
+            )}
+            <NotificationBell badges={badges} onChange={loadBadges} />
+            <Menu
+              label="บัญชีผู้ใช้"
+              icon={<span className="avatar" style={{ width: 30, height: 30, fontSize: 12 }}>{initials(user.full_name)}</span>}
+              items={[
+                { label: 'เปลี่ยนรหัสผ่าน', to: '/profile', icon: <KeyRound size={15} /> },
+                '-',
+                { label: 'ออกจากระบบ', onClick: logout, icon: <LogOut size={15} />, danger: true },
+              ]}
+            />
+          </div>
         </header>
         <main className="content" id="main">
           <Outlet />
