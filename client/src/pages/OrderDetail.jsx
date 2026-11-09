@@ -190,17 +190,17 @@ export default function OrderDetail() {
 }
 
 function RejectDialog({ busy, onClose, onSubmit }) {
-  const toast = useToast();
   const [note, setNote] = useState('');
-  const submit = () => (note.trim() ? onSubmit(note.trim()) : toast.error('กรุณาระบุเหตุผลที่ไม่อนุมัติ'));
+  const [err, setErr] = useState('');
+  const submit = () => (note.trim() ? onSubmit(note.trim()) : setErr('กรุณาระบุเหตุผลที่ไม่อนุมัติ — ผู้สั่งจะเห็นข้อความนี้'));
   return (
     <Modal title="ไม่อนุมัติรายการสั่งซื้อ" onClose={onClose}
       footer={<>
         <button className="btn" onClick={onClose} disabled={busy}>ยกเลิก</button>
         <button className="btn btn-primary" onClick={submit} disabled={busy}>{busy ? 'กำลังบันทึก…' : 'ไม่อนุมัติ'}</button>
       </>}>
-      <Field label="เหตุผล" required hint="ผู้สั่งจะเห็นข้อความนี้ในรายการสั่งซื้อ">
-        <textarea className="input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+      <Field label="เหตุผล" required error={err} hint="ผู้สั่งจะเห็นข้อความนี้ในรายการสั่งซื้อ">
+        <textarea className="textarea" rows={3} value={note} onChange={(e) => { setNote(e.target.value); setErr(''); }} maxLength={500} />
       </Field>
     </Modal>
   );

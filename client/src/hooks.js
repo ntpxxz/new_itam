@@ -57,6 +57,40 @@ export function useQueryState(defaults) {
   return [state, set];
 }
 
+// Unsaved slip kept in sessionStorage (this tab only) so a refresh or wandering off the page doesn't lose it.
+// Returns the draft found on mount (restore it yourself), and clear() for after a successful save.
+// `value` is stored while `keep` is true, removed when it turns false.
+export function useDraft(key, value, keep) {
+  const storageKey = key && `draft:${key}`;
+  const [found] = useState(() => {
+    if (!storageKey) return null;
+    try { return JSON.parse(sessionStorage.getItem(storageKey)) || null; } catch { return null; }
+  });
+  const cleared = useRef(false);
+  useEffect(() => {
+    if (!storageKey || cleared.current) return;
+    try {
+      if (keep) sessionStorage.setItem(storageKey, JSON.stringify({ at: Date.now(), value }));
+      else sessionStorage.removeItem(storageKey);
+    } catch { /* storage full or blocked — the form still works */ }
+  }, [storageKey, keep, JSON.stringify(value)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const clear = useCallback(() => {
+    cleared.current = true;
+    try { if (storageKey) sessionStorage.removeItem(storageKey); } catch { /* ignore */ }
+  }, [storageKey]);
+  return { found, clear };
+}
+
+// Browser prompt before closing/reloading the tab while there is unsaved work.
+export function useLeaveGuard(active) {
+  useEffect(() => {
+    if (!active) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [active]);
+}
+
 export function useDebounced(value, ms = 300) {
   const [v, setV] = useState(value);
   useEffect(() => { const t = setTimeout(() => setV(value), ms); return () => clearTimeout(t); }, [value, ms]);

@@ -399,6 +399,10 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
 .line-summary strong { color: var(--text); font-weight: 600; }
 .form-grid .span-3 { grid-column: 1 / -1; }
 
+.save-state { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.save-state.saved { color: var(--success); }
+.save-state.error { color: var(--danger-text); }
+
 /* ---------- Document slip ---------- */
 .doc-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 2px solid var(--brand); }
 .doc-title { font-size: 20px; font-weight: 600; margin-top: 2px; }

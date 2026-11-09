@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PackageMinus, PackageCheck, Laptop, Package, Trash2, Save, Minus, Plus, CalendarClock } from 'lucide-react';
 import { api } from '../api.js';
-import { clearLookupCache } from '../hooks.js';
+import { clearLookupCache, useDraft, useLeaveGuard } from '../hooks.js';
 import RecipientFields, { EMPTY_RECIPIENT, hasRecipient } from '../components/RecipientFields.jsx';
 import { useAuth } from '../auth.jsx';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Field, Select, Empty, StatusChip, STATUS } from '../components/ui.jsx';
+import { PageHeader, Card, Field, Empty, StatusChip, STATUS, DraftNotice, focusFirstError } from '../components/ui.jsx';
 import ItemPicker from '../components/ItemPicker.jsx';
 import DocList from '../components/DocList.jsx';
 import { fmtNum, todayISO, addDaysISO, daysFromToday } from '../format.js';
@@ -14,7 +14,7 @@ import { fmtNum, todayISO, addDaysISO, daysFromToday } from '../format.js';
 let seq = 1;
 
 export default function Issue() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [sp] = useSearchParams();
@@ -25,6 +25,23 @@ export default function Issue() {
   const [errs, setErrs] = useState({});
   const [order, setOrder] = useState(null);
   const orderId = sp.get('order');
+  // Handover slips come from the order, so only a plain เบิกออก is kept as a draft.
+  const draft = useDraft(orderId ? null : `issue:${user.id}`, { head, who, lines }, lines.length > 0);
+  const [restored, setRestored] = useState(null);
+  useLeaveGuard(lines.length > 0);
+  useEffect(() => {
+    const d = draft.found;
+    if (orderId || !d?.value?.lines?.length) return;
+    seq = Math.max(seq, ...d.value.lines.map((l) => l.key + 1));
+    setHead(d.value.head);
+    setWho(d.value.who);
+    setLines(d.value.lines);
+    setRestored(d.at);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const startOver = () => {
+    setHead({ doc_date: todayISO(), mode: 'issue', due_date: addDaysISO(7), note: '' });
+    setWho(EMPTY_RECIPIENT); setLines([]); setErrs({}); setRestored(null);
+  };
   const canCons = can('consumable.move');
   const canAsset = can('asset.transact');
 
@@ -70,7 +87,7 @@ export default function Issue() {
     else if (head.doc_date > todayISO()) e.doc_date = 'วันที่เบิกต้องไม่เป็นวันในอนาคต';
     if (head.mode === 'borrow' && (!head.due_date || head.due_date < head.doc_date)) e.due_date = 'วันกำหนดคืนต้องไม่ก่อนวันที่เบิก';
     setErrs(e);
-    if (Object.keys(e).length) return;
+    if (Object.keys(e).length) { focusFirstError(); return; }
     if (borrowBlocked) { toast.error('รายการนับจำนวนเป็นของสิ้นเปลือง ยืมไม่ได้ — เปลี่ยนเป็น “เบิกออก” หรือลบรายการนั้นออก'); return; }
     setBusy(true);
     try {
@@ -83,6 +100,7 @@ export default function Issue() {
           : { kind: 'consumable', consumable_id: l.item.id, qty: l.qty })),
       });
       clearLookupCache();
+      draft.clear();
       toast.success(order ? `ส่งมอบ ${order.order.order_no} แล้ว — ใบเบิก ${r.doc_no}` : `บันทึกใบเบิก ${r.doc_no} แล้ว`);
       navigate(`/documents/${r.id}`);
     } catch (ex) { toast.error(ex); } finally { setBusy(false); }
@@ -107,6 +125,8 @@ export default function Issue() {
           </span>
         </div>
       )}
+
+      {restored && lines.length > 0 && <DraftNotice at={restored} what="ใบเบิก" onDiscard={startOver} />}
 
       <Card title="ข้อมูลใบเบิก">
         <div className="form-grid cols-3">

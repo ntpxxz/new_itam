@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PackagePlus, Laptop, Package, Trash2, Plus, Save } from 'lucide-react';
 import { api } from '../api.js';
-import { useLookup } from '../hooks.js';
+import { useLookup, useDraft, useLeaveGuard } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Field, Select, Empty, CategorySelect, KIND_LABEL } from '../components/ui.jsx';
+import { PageHeader, Card, Field, Select, Empty, CategorySelect, KIND_LABEL, DraftNotice, focusFirstError } from '../components/ui.jsx';
 import ItemPicker from '../components/ItemPicker.jsx';
 import DocList from '../components/DocList.jsx';
 import { fmtMoney, fmtNum, todayISO, daysFromToday } from '../format.js';
@@ -16,16 +16,29 @@ const newItemLine = () => ({ key: seq++, kind: 'new', category_id: '', name: '',
   sku: '', unit: 'ชิ้น', reorder_point: '' });
 const serialsOf = (l) => l.serialsText.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
 const assetQty = (l) => Math.max(serialsOf(l).length, parseInt(l.qty, 10) || 0);
+const emptyHead = () => ({ doc_date: todayISO(), purchase_date: '', vendor_id: '', po_number: '', invoice_number: '', location_id: '', note: '' });
 
 export default function Receive() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const vendors = useLookup('vendors');
   const locs = useLookup('locations');
   const allCats = useLookup('categories');
-  const [head, setHead] = useState({ doc_date: todayISO(), purchase_date: '', vendor_id: '', po_number: '', invoice_number: '', location_id: '', note: '' });
+  const [head, setHead] = useState(emptyHead);
   const [lines, setLines] = useState([]);
+  const draft = useDraft(`receive:${user.id}`, { head, lines }, lines.length > 0);
+  const [restored, setRestored] = useState(null);
+  useLeaveGuard(lines.length > 0);
+  useEffect(() => {
+    const d = draft.found;
+    if (!d?.value?.lines?.length) return;
+    seq = Math.max(seq, ...d.value.lines.map((l) => l.key + 1));
+    setHead(d.value.head);
+    setLines(d.value.lines);
+    setRestored(d.at);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const startOver = () => { setHead(emptyHead()); setLines([]); setErrs({}); setRestored(null); };
   const [busy, setBusy] = useState(false);
   const [errs, setErrs] = useState({});
   const canCons = can('consumable.move');
@@ -73,7 +86,7 @@ export default function Receive() {
       }
     });
     setErrs(e);
-    if (Object.keys(e).length) { toast.error('กรอกข้อมูลให้ครบในช่องที่ไฮไลต์ก่อนบันทึก'); return; }
+    if (Object.keys(e).length) { toast.error('กรอกข้อมูลให้ครบในช่องที่ไฮไลต์ก่อนบันทึก'); focusFirstError(); return; }
     setBusy(true);
     try {
       const body = {
@@ -87,6 +100,7 @@ export default function Receive() {
         }),
       };
       const r = await api.post('/api/documents/receive', body);
+      draft.clear();
       toast.success(`บันทึกใบรับเข้า ${r.doc_no} แล้ว`);
       navigate(`/documents/${r.id}`);
     } catch (ex) { toast.error(ex); } finally { setBusy(false); }
@@ -99,6 +113,8 @@ export default function Receive() {
           <Save size={16} />{busy ? 'กำลังบันทึก…' : `บันทึกรับเข้า${lines.length ? ` (${lines.length} รายการ)` : ''}`}
         </button>
       </PageHeader>
+
+      {restored && lines.length > 0 && <DraftNotice at={restored} what="ใบรับเข้า" onDiscard={startOver} />}
 
       <Card title="ข้อมูลใบรับเข้า">
         <div className="form-grid cols-3">

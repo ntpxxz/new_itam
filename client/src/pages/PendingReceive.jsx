@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ClipboardList, FileUp, Download, AlertTriangle, PackageCheck, PackagePlus, Search, Trash2, XCircle } from 'lucide-react';
+import { ClipboardList, FileUp, Download, AlertTriangle, PackageCheck, PackagePlus, Search, Trash2, XCircle, Check } from 'lucide-react';
 import { api } from '../api.js';
 import { useLookup } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
@@ -61,11 +61,22 @@ export default function PendingReceive() {
     } finally { setBusy(false); }
   };
 
+  // Row edits save on blur; show กำลังบันทึก… → ✓ บันทึกแล้ว (fades) or an error next to the row's status.
+  const [saving, setSaving] = useState({});
+  const timers = useRef({});
+  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
+  const markRow = (id, state) => {
+    clearTimeout(timers.current[id]);
+    setSaving((s) => ({ ...s, [id]: state }));
+    if (state === 'saved') timers.current[id] = setTimeout(() => setSaving((s) => { const n = { ...s }; delete n[id]; return n; }), 2000);
+  };
   const saveLine = async (r, patch) => {
+    markRow(r.id, 'saving');
     try {
       const updated = await api.put(`/api/pending-receipts/${r.id}`, patch);
       setData((d) => ({ ...d, rows: d.rows.map((x) => (x.id === r.id ? updated : x)) }));
-    } catch (e) { toast.error(e); load(); }
+      markRow(r.id, 'saved');
+    } catch (e) { toast.error(e); markRow(r.id, 'error'); load(); }
   };
 
   const cancel = async () => {
@@ -218,6 +229,11 @@ export default function PendingReceive() {
                         ) : <span className="mono">{fmtMoney(r.unit_cost ?? r.item_unit_cost)}</span>}
                       </td>
                       <td>
+                        {saving[r.id] && (
+                          <div className={`save-state ${saving[r.id]}`} role="status">
+                            {saving[r.id] === 'saving' ? 'กำลังบันทึก…' : saving[r.id] === 'saved' ? <><Check size={12} aria-hidden />บันทึกแล้ว</> : 'บันทึกไม่สำเร็จ — แก้แล้วลองอีกครั้ง'}
+                          </div>
+                        )}
                         {r.status === 'received' && (
                           <div className="stack" style={{ gap: 4, alignItems: 'flex-start' }}>
                             <Chip tone="success">รับเข้าแล้ว</Chip>
@@ -298,12 +314,14 @@ function ReceiveDialog({ rows, skipped, onClose, onDone }) {
   const po = rows.length && rows.every((r) => r.po_id && r.po_id === rows[0].po_id) ? rows[0] : null;
   const [head, setHead] = useState({ doc_date: todayISO(), vendor_id: po ? String(po.po_vendor_id) : '', location_id: '', po_number: po?.po_no || '', invoice_number: '', note: '' });
   const [busy, setBusy] = useState(false);
-  const set = (k) => (v) => setHead((h) => ({ ...h, [k]: v?.target ? v.target.value : v }));
+  const [err, setErr] = useState({});
+  const set = (k) => (v) => { setHead((h) => ({ ...h, [k]: v?.target ? v.target.value : v })); setErr((e) => ({ ...e, [k]: null })); };
   const units = useMemo(() => rows.reduce((s, r) => s + r.qty, 0), [rows]);
   const value = useMemo(() => rows.reduce((s, r) => s + r.qty * (Number(r.unit_cost ?? r.item_unit_cost) || 0), 0), [rows]);
 
   const submit = async () => {
-    if (!head.doc_date || head.doc_date > todayISO()) { toast.error('วันที่รับเข้าต้องไม่เป็นวันในอนาคต'); return; }
+    if (!head.doc_date) { setErr({ doc_date: 'กรุณาระบุวันที่รับเข้า' }); return; }
+    if (head.doc_date > todayISO()) { setErr({ doc_date: 'วันที่รับเข้าต้องไม่เป็นวันในอนาคต' }); return; }
     setBusy(true);
     try {
       onDone(await api.post('/api/pending-receipts/receive', { ...head, ids: rows.map((r) => r.id) }));
@@ -322,7 +340,7 @@ function ReceiveDialog({ rows, skipped, onClose, onDone }) {
           {skipped > 0 && ` · ข้าม ${skipped} รายการที่ยังไม่พร้อม (ยังรออยู่ในรายการ)`}
         </p>
         <div className="form-grid">
-          <Field label="วันที่รับเข้า" required hint="เลือกย้อนหลังได้ หากของมาถึงก่อนวันนี้">
+          <Field label="วันที่รับเข้า" required error={err.doc_date} hint="เลือกย้อนหลังได้ หากของมาถึงก่อนวันนี้">
             <input type="date" className="input" value={head.doc_date} max={todayISO()} onChange={set('doc_date')} />
           </Field>
           <Field label="เก็บเข้าสถานที่"><Select value={head.location_id} onChange={set('location_id')} options={locs.map((l) => ({ value: l.id, label: l.name }))} /></Field>
@@ -342,11 +360,15 @@ function NewItemDialog({ line, onClose, onDone }) {
   const cats = useLookup('categories', { kind: 'consumable' });
   const [v, setV] = useState({ name: line.name || '', category_id: '', unit: 'ชิ้น', reorder_point: '0', unit_cost: line.unit_cost ?? '' });
   const [busy, setBusy] = useState(false);
-  const set = (k) => (e) => setV((x) => ({ ...x, [k]: e?.target ? e.target.value : e }));
+  const [err, setErr] = useState({});
+  const set = (k) => (e) => { setV((x) => ({ ...x, [k]: e?.target ? e.target.value : e })); setErr((x) => ({ ...x, [k]: null })); };
 
   const submit = async () => {
-    if (!v.name.trim()) { toast.error('กรุณากรอกชื่อรายการ'); return; }
-    if (!v.category_id) { toast.error('กรุณาเลือกหมวดหมู่'); return; }
+    const e = {};
+    if (!v.name.trim()) e.name = 'กรุณากรอกชื่อรายการ';
+    if (!v.category_id) e.category_id = 'กรุณาเลือกหมวดหมู่';
+    setErr(e);
+    if (Object.keys(e).length) return;
     setBusy(true);
     try {
       onDone(await api.post('/api/consumables', { ...v, sku: line.sku, unit_cost: v.unit_cost === '' ? null : v.unit_cost, qty_on_hand: 0 }));
@@ -364,8 +386,8 @@ function NewItemDialog({ line, onClose, onDone }) {
       <div className="stack" style={{ gap: 12 }}>
         <p className="field-hint">วัสดุสิ้นเปลือง บาร์โค้ด <strong className="mono">{line.sku}</strong> · สต็อกเริ่มต้น 0 — จำนวน {fmtNum(line.qty)} จะเข้าสต็อกเมื่อกด “รับเข้า”</p>
         <div className="form-grid">
-          <Field label="ชื่อรายการ" required><input className="input" value={v.name} onChange={set('name')} maxLength={300} /></Field>
-          <Field label="หมวดหมู่" required>
+          <Field label="ชื่อรายการ" required error={err.name}><input className="input" value={v.name} onChange={set('name')} maxLength={300} /></Field>
+          <Field label="หมวดหมู่" required error={err.category_id}>
             <Select value={v.category_id} onChange={set('category_id')} options={cats.map((c) => ({ value: c.id, label: c.name }))} />
           </Field>
           <Field label="หน่วยนับ"><input className="input" value={v.unit} onChange={set('unit')} /></Field>

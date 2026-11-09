@@ -3,7 +3,7 @@ import { Paperclip, AlertTriangle } from 'lucide-react';
 import { api } from '../api.js';
 import { useLookup, clearLookupCache } from '../hooks.js';
 import { useToast } from './Toast.jsx';
-import { Modal, Field, Select, StatusChip } from './ui.jsx';
+import { Modal, Field, Select, StatusChip, focusFirstError } from './ui.jsx';
 import RecipientFields, { EMPTY_RECIPIENT, hasRecipient } from './RecipientFields.jsx';
 import { ACTION_META } from './actions.jsx';
 import { todayISO, addDaysISO } from '../format.js';
@@ -53,7 +53,7 @@ export default function ActionDialog({ asset, action, onClose, onDone }) {
     if (needs.includes('evidence') && !file) errs.evidence = 'ต้องแนบหลักฐาน เช่น ใบอนุมัติจำหน่าย หรือรูปถ่าย';
     if (action.key === 'transfer' && !hasRecipient(who) && !v.location_id) errs.recipient = 'ระบุปลายทางอย่างน้อย 1 อย่าง';
     setErr(errs);
-    if (Object.keys(errs).length) return;
+    if (Object.keys(errs).length) { focusFirstError(e.currentTarget); return; }
 
     const fd = new FormData();
     for (const [k, val] of Object.entries({ ...v, ...(showDept ? who : {}) })) {

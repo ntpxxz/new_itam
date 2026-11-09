@@ -1,6 +1,6 @@
 import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X, MoreHorizontal, ChevronLeft, ChevronRight, Inbox, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, MoreHorizontal, ChevronLeft, ChevronRight, Inbox, ChevronUp, ChevronDown, History } from 'lucide-react';
 import { fmtNum } from '../format.js';
 
 export const STATUS = {
@@ -102,10 +102,13 @@ export function Modal({ title, onClose, children, footer, wide, initialFocus = t
   const titleId = useId();
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  // Once the user has typed or picked something, only the explicit buttons (X / ยกเลิก) close the dialog.
+  const touched = useRef(false);
+  const touch = () => { touched.current = true; };
   useEffect(() => {
     const prev = document.activeElement;
     const onKey = (e) => {
-      if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'Escape' && !touched.current) closeRef.current();
       if (e.key === 'Tab' && ref.current) {
         const f = ref.current.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
         const list = [...f].filter((el) => !el.disabled && el.offsetParent !== null);
@@ -125,8 +128,9 @@ export function Modal({ title, onClose, children, footer, wide, initialFocus = t
   }, [initialFocus]);
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref}>
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !touched.current && onClose()}>
+      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref}
+        onInput={touch} onChange={touch}>
         <div className="modal-head">
           <h2 id={titleId}>{title}</h2>
           <button className="icon-btn plain" onClick={onClose} aria-label="ปิด"><X size={18} /></button>
@@ -134,6 +138,29 @@ export function Modal({ title, onClose, children, footer, wide, initialFocus = t
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
+    </div>
+  );
+}
+
+// After a failed validation: bring the first highlighted field into view and focus it.
+export function focusFirstError(root = document) {
+  requestAnimationFrame(() => {
+    const el = root.querySelector('[aria-invalid="true"]') || root.querySelector('.field-error');
+    if (!el) return;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+    if (el.matches('input, select, textarea')) el.focus({ preventScroll: true });
+  });
+}
+
+// "Restored an unsaved slip" notice with a way to start over.
+export function DraftNotice({ at, what, onDiscard }) {
+  const time = new Date(at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  return (
+    <div className="alert info" role="status">
+      <History size={18} aria-hidden />
+      <span className="alert-detail">กู้คืน{what}ที่ยังไม่บันทึกแล้ว (แก้ไขล่าสุด <span className="mono">{time}</span> น.)</span>
+      <button type="button" className="btn btn-sm btn-ghost" onClick={onDiscard}>เริ่มใบใหม่</button>
     </div>
   );
 }
