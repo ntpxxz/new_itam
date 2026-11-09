@@ -194,7 +194,7 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
 }
 .alert > svg { color: var(--warning); flex: none; }
 .alert strong { font-weight: 600; }
-.alert .alert-detail { color: var(--text-muted); flex: 1; min-width: 160px; }
+.alert .alert-detail { color: var(--text-muted); flex: 1; min-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .alert a { font-weight: 500; white-space: nowrap; }
 .alert.info { background: var(--brand-soft); border-color: var(--brand-soft); }
 .alert.info > svg { color: var(--brand); }

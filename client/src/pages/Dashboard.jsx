@@ -6,6 +6,18 @@ import { PageHeader, Card, Loading, Empty, STATUS_DOT } from '../components/ui.j
 import ActivityFeed from '../components/ActivityFeed.jsx';
 import { fmtDate, fmtNum, fmtMonth, fmtMoney, fmtMoneyShort, daysFromToday, who } from '../format.js';
 
+// "MSI MAG A750BN PCIE5, Non-Modular Compact…" → "MSI MAG A750BN PCIE5": part before , ( / then whole words up to 24 chars.
+function shortName(name, max = 24) {
+  const head = name.split(/[,(/]/)[0].trim() || name;
+  if (head.length <= max) return head === name ? name : `${head}…`;
+  let out = '';
+  for (const w of head.split(/\s+/)) {
+    if (out && (out + ' ' + w).length > max) break;
+    out = out ? `${out} ${w}` : w;
+  }
+  return `${out.slice(0, max)}…`;
+}
+
 function Kpi({ label, value, dot, trend, to }) {
   return (
     <Link to={to} className="card kpi">
@@ -93,7 +105,9 @@ export default function Dashboard() {
             <div className="alert">
               <PackageX size={18} aria-hidden />
               <strong>วัสดุสิ้นเปลืองต่ำกว่าจุดสั่งซื้อ {data.lowStock.length} รายการ</strong>
-              <span className="alert-detail">{data.lowStock.slice(0, 3).map((x) => `${x.name} (เหลือ ${x.qty_on_hand})`).join(', ')}{data.lowStock.length > 3 ? ' …' : ''}</span>
+              <span className="alert-detail" title={data.lowStock.map((x) => `${x.name} (เหลือ ${x.qty_on_hand})`).join(', ')}>
+                {data.lowStock.slice(0, 2).map((x) => `${shortName(x.name)} (เหลือ ${x.qty_on_hand})`).join(', ')}{data.lowStock.length > 2 ? ` และอีก ${data.lowStock.length - 2} รายการ` : ''}
+              </span>
               <Link to="/assets?status=low">ดูทั้งหมด →</Link>
             </div>
           )}
