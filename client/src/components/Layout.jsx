@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, Laptop, ArrowLeftRight, History, PackagePlus, PackageMinus, BarChart3, ScanLine, Printer, ClipboardCheck, FileSpreadsheet,
-  Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, Search, LogOut, KeyRound, Boxes,
+  Users, Database, UserCog, ShieldCheck, ScrollText, Settings, Menu as MenuIcon, LogOut, KeyRound, Boxes,
   ClipboardList, ShoppingCart, ReceiptText, FileText, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../auth.jsx';
@@ -10,6 +10,7 @@ import { api } from '../api.js';
 import { initials } from '../format.js';
 import { useCart } from '../cart.js';
 import NotificationBell from './NotificationBell.jsx';
+import GlobalSearch from './GlobalSearch.jsx';
 import { Menu } from './ui.jsx';
 import AssistantChat from './AssistantChat.jsx';
 
@@ -72,11 +73,9 @@ export default function Layout() {
     });
   };
   const [badges, setBadges] = useState({ overdue: 0, lowStock: 0, pendingReceive: 0, pendingOrders: 0, notifications: 0 });
-  const [q, setQ] = useState('');
   const cart = useCart();
   const searchRef = useRef(null);
   const loc = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => { setOpen(false); }, [loc.pathname]);
   const loadBadges = () => api.get('/api/dashboard/badges').then(setBadges).catch(() => {});
@@ -93,15 +92,6 @@ export default function Layout() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-
-  const submitSearch = (e) => {
-    e.preventDefault();
-    const term = q.trim();
-    if (!term) return;
-    navigate(`/assets?q=${encodeURIComponent(term)}`);
-    setQ('');
-    searchRef.current?.blur();
-  };
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -162,13 +152,11 @@ export default function Layout() {
               <MenuIcon size={18} />
             </button>
           </div>
-          {can('asset.view') || can('consumable.view') ? (
-            <form className="topbar-search input-icon" onSubmit={submitSearch} role="search">
-              <Search size={16} aria-hidden />
-              <input ref={searchRef} className="input" type="search" value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder="ค้นหารหัสทรัพย์สิน, Serial, ชื่อ, ผู้ถือครอง" aria-label="ค้นหาอุปกรณ์" />
-              <span className="kbd" aria-hidden>{isMac ? '⌘K' : 'Ctrl K'}</span>
-            </form>
+          {['asset.view', 'consumable.view', 'order.create', 'order.manage'].some(can) ? (
+            <div role="search">
+              <GlobalSearch ref={searchRef} canRegister={can('asset.view') || can('consumable.view')} kbd={isMac ? '⌘K' : 'Ctrl K'}
+                placeholder={can('asset.view') || can('consumable.view') ? 'ค้นหารหัส, Serial, ชื่อ, ผู้ถือครอง, เลขที่เอกสาร' : 'ค้นหาเลขที่รายการสั่งซื้อ'} />
+            </div>
           ) : <div />}
           <div className="topbar-end">
             {can('order.create') && (

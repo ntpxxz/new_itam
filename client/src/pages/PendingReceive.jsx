@@ -159,7 +159,7 @@ export default function PendingReceive() {
             </Empty>
           ) : (
             <div className="table-wrap">
-              <table className="table">
+              <table className="table cards">
                 <thead>
                   <tr>
                     {pending && canMove && (
@@ -181,12 +181,12 @@ export default function PendingReceive() {
                   {rows.map((r) => (
                     <tr key={r.id}>
                       {pending && canMove && (
-                        <td>
+                        <td className="cell-check">
                           <input type="checkbox" className="check" checked={picked.has(r.id)} onChange={() => toggle(r.id)}
                             aria-label={`เลือก ${r.item_name || r.name || r.sku}`} />
                         </td>
                       )}
-                      <td style={{ minWidth: 220 }}>
+                      <td className="cell-primary" style={{ minWidth: 220 }}>
                         {r.item_id ? <Link to={`/consumables/${r.item_id}`} className="cell-main">{r.item_name}</Link> : <div className="cell-main">{r.name || '—'}</div>}
                         {edit && r.state !== 'ready' && !r.order_line_id ? (
                           <input className="input mono" style={{ marginTop: 4, maxWidth: 220 }} defaultValue={r.sku ?? ''} key={`s${r.id}-${r.sku}`}
@@ -198,7 +198,7 @@ export default function PendingReceive() {
                           <div className="tag">{r.sku}{r.item_id && r.name && r.name.toLowerCase() !== r.item_name.toLowerCase() ? ` · ในไฟล์: ${r.name}` : ''}</div>
                         )}
                       </td>
-                      <td>
+                      <td data-label="ที่มา">
                         <div className="cell-sub">
                           {r.order_id ? <Link to={`/orders/${r.order_id}`} className="mono">{r.order_no}</Link> : r.file_name || '—'}
                           {r.line_no ? ` · ${r.order_id ? 'รายการ' : 'แถว'} ${r.line_no}` : ''}
@@ -206,15 +206,15 @@ export default function PendingReceive() {
                         {r.po_no && <div className="cell-sub">{can('order.manage') ? <Link to={`/purchase-orders/${r.po_id}`} className="mono">{r.po_no}</Link> : <span className="mono">{r.po_no}</span>}</div>}
                         <div className="cell-sub">{fmtDateTime(r.created_at)} · {r.created_by_name}</div>
                       </td>
-                      <td className="text-right mono">{r.item_id ? `${fmtNum(r.qty_on_hand)} ${r.unit}` : '—'}</td>
-                      <td className="text-right">
+                      <td className="text-right mono" data-label="คงเหลือ">{r.item_id ? `${fmtNum(r.qty_on_hand)} ${r.unit}` : '—'}</td>
+                      <td className="text-right" data-label="จำนวน">
                         {edit ? (
                           <input type="number" min="1" inputMode="numeric" className="input mono" style={{ width: 84, textAlign: 'right' }}
                             defaultValue={r.qty ?? ''} key={`q${r.id}-${r.qty}`} aria-label={`จำนวน ${r.sku || `แถว ${r.line_no ?? ''}`}`}
                             onBlur={(e) => { const v = parseInt(e.target.value, 10); if (v !== r.qty) saveLine(r, { qty: Number.isNaN(v) ? 0 : v }); }} />
                         ) : <span className="mono">{fmtNum(r.qty)}</span>}
                       </td>
-                      <td className="text-right">
+                      <td className="text-right" data-label="ราคา/หน่วย">
                         {edit ? (
                           <input type="number" min="0" step="0.01" inputMode="decimal" className="input mono" style={{ width: 104, textAlign: 'right' }}
                             defaultValue={r.unit_cost ?? ''} key={`c${r.id}-${r.unit_cost}`} placeholder={r.item_unit_cost != null ? String(r.item_unit_cost) : '—'}
@@ -222,7 +222,7 @@ export default function PendingReceive() {
                             onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== r.unit_cost) saveLine(r, { unit_cost: v }); }} />
                         ) : <span className="mono">{fmtMoney(r.unit_cost ?? r.item_unit_cost)}</span>}
                       </td>
-                      <td>
+                      <td data-label="สถานะ">
                         {saving[r.id] && (
                           <div className={`save-state ${saving[r.id]}`} role="status">
                             {saving[r.id] === 'saving' ? 'กำลังบันทึก…' : saving[r.id] === 'saved' ? <><Check size={12} aria-hidden />บันทึกแล้ว</> : 'บันทึกไม่สำเร็จ — แก้แล้วลองอีกครั้ง'}
@@ -252,7 +252,7 @@ export default function PendingReceive() {
                         )}
                       </td>
                       {canDelete && (
-                        <td>
+                        <td className="actions">
                           <button className="icon-btn plain" onClick={() => setDeleting([r])} aria-label={`ลบ ${r.item_name || r.name || r.sku || `แถว ${r.line_no ?? ''}`}`} title="ลบ">
                             <Trash2 size={16} />
                           </button>

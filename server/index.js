@@ -23,6 +23,7 @@ import purchaseOrderRoutes from './routes/purchase-orders.js';
 import notificationRoutes from './routes/notifications.js';
 import reportRoutes from './routes/reports.js';
 import assistantRoutes from './routes/assistant.js';
+import searchRoutes from './routes/search.js';
 
 const PORT = Number(process.env.PORT || 3093);
 const PROD = process.argv.includes('--prod') || process.env.NODE_ENV === 'production';
@@ -71,6 +72,7 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/assistant', assistantRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/consumables', consumableRoutes);
 app.use('/api/dashboard', dashboardRoutes);

@@ -194,6 +194,8 @@ available ──transfer──▶ available (location/department move)
 - SQL must run on both SQLite and SQL Server: write SQLite syntax with `?`; `db.js` rewrites `?`, `LIMIT/OFFSET` (needs ORDER BY), `COLLATE NOCASE`, `length()`. Do date math in JS (`today()`, `addDays()`, `monthStart()`, `minutesAgo()`) and pass it as a parameter; use `ym()` / `localDate()` / `dateOf()` for the rest. No `ON CONFLICT`, `INSERT OR`, `IS NOT ?`, `||`, boolean expressions in SELECT (use CASE), `rowid`; alias derived tables; quote the `key` column as `"key"`.
 - Schema changes: update `schema.sql` (+ `addColumn()`) **and** `schema.mssql.sql`.
 - Keep comments sparse; name things clearly instead.
+- Topbar search = `GET /api/search` (`server/routes/search.js`, UI `GlobalSearch.jsx`): ≤ 5 hits per kind, only kinds the user may view; add new record types there.
+- Phone lists: mark the table `cards` and give cells `cell-primary` / `cell-check` / `data-label` / `actions` — CSS turns rows into cards below 760px.
 
 ---
 

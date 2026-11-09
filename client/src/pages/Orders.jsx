@@ -66,24 +66,24 @@ export default function Orders() {
           </div>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table cards">
               <thead>
                 <tr><th>เลขที่</th><th>ผู้รับ</th><th className="text-right">รายการ</th><th>สั่งเมื่อ</th><th>สถานะ</th></tr>
               </thead>
               <tbody>
                 {data.rows.map((o) => (
                   <tr key={o.id} className="clickable" onClick={() => navigate(`/orders/${o.id}`)}>
-                    <td><Link to={`/orders/${o.id}`} className="cell-main mono" onClick={(e) => e.stopPropagation()}>{o.order_no}</Link></td>
-                    <td>
+                    <td className="cell-primary"><Link to={`/orders/${o.id}`} className="cell-main mono" onClick={(e) => e.stopPropagation()}>{o.order_no}</Link></td>
+                    <td data-label="ผู้รับ">
                       <div className="cell-main">{who(o.person_name, o.department_name) || '—'}</div>
                       {o.person_name && o.department_name && <div className="cell-sub">{o.department_name}</div>}
                     </td>
-                    <td className="text-right nowrap"><span className="mono">{fmtNum(o.line_count)}</span> รายการ · <span className="mono">{fmtNum(o.unit_count)}</span> หน่วย</td>
-                    <td>
+                    <td className="text-right nowrap" data-label="รายการ"><span className="mono">{fmtNum(o.line_count)}</span> รายการ · <span className="mono">{fmtNum(o.unit_count)}</span> หน่วย</td>
+                    <td data-label="สั่งเมื่อ">
                       <div>{fmtDateTime(o.created_at)}</div>
                       <div className="cell-sub">{o.requested_by_name}</div>
                     </td>
-                    <td>
+                    <td data-label="สถานะ">
                       <OrderChip status={o.status} />
                       {o.status === 'approved' && <div className="cell-sub">{o.awaiting_lines > 0 ? `รอรับเข้า ${o.awaiting_lines} รายการ` : 'รับเข้าครบ · รอส่งมอบ'}</div>}
                     </td>
@@ -115,7 +115,7 @@ function ApprovedItems({ rows, q }) {
   return (
     <>
       <div className="table-wrap">
-        <table className="table">
+        <table className="table cards">
           <thead>
             <tr>
               <th style={{ width: 40 }}><input type="checkbox" className="check" checked={allShown} disabled={!shown.length} onChange={toggleShown} aria-label="เลือกทุกรายการที่แสดง" /></th>
@@ -125,17 +125,17 @@ function ApprovedItems({ rows, q }) {
           <tbody>
             {shown.map((r) => (
               <tr key={r.id} className="clickable" onClick={() => toggle(r.id)}>
-                <td><input type="checkbox" className="check" checked={picked.has(r.id)} onChange={() => toggle(r.id)} onClick={(e) => e.stopPropagation()} aria-label={`เลือก ${r.name} จาก ${r.order_no}`} /></td>
-                <td>
+                <td className="cell-check"><input type="checkbox" className="check" checked={picked.has(r.id)} onChange={() => toggle(r.id)} onClick={(e) => e.stopPropagation()} aria-label={`เลือก ${r.name} จาก ${r.order_no}`} /></td>
+                <td className="cell-primary">
                   <div className="cell-main">{r.name}</div>
                   <div className="cell-sub">{[r.category_name, r.brand, r.model].filter(Boolean).join(' · ')}{r.sku && <> · <span className="mono">{r.sku}</span></>}</div>
                 </td>
-                <td className="nowrap">
+                <td className="nowrap" data-label="รายการสั่งซื้อ">
                   <Link to={`/orders/${r.order_id}`} className="mono" onClick={(e) => e.stopPropagation()}>{r.order_no}</Link>
                   <div className="cell-sub">{who(r.person_name, r.department_name) || '—'}</div>
                 </td>
-                <td className="text-right nowrap"><span className="mono">{fmtNum(r.qty)}</span> {r.unit}</td>
-                <td className="text-right mono">{fmtMoney(r.unit_cost)}</td>
+                <td className="text-right nowrap" data-label="จำนวน"><span className="mono">{fmtNum(r.qty)}</span> {r.unit}</td>
+                <td className="text-right mono" data-label="ราคา/หน่วย">{fmtMoney(r.unit_cost)}</td>
               </tr>
             ))}
           </tbody>

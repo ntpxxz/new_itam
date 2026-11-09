@@ -129,7 +129,7 @@ export default function Assets() {
           </Empty>
         ) : (
           <div className="table-wrap" style={{ opacity: loading ? 0.6 : 1 }}>
-            <table className="table">
+            <table className="table cards">
               <thead>
                 <tr>
                   <th style={{ width: 40 }}>
@@ -173,7 +173,7 @@ export default function Assets() {
 
 function CategoryCell({ r }) {
   return (
-    <td>
+    <td data-label="หมวดหมู่">
       <div className="muted">{r.category_name}</div>
       <div className="cell-sub">{KIND_LABEL[r.kind]}</div>
     </td>
@@ -186,10 +186,10 @@ function AssetRow({ r, can, selected, onToggle, onOpen, onDelete }) {
   const deletable = can('asset.delete') && !['borrowed', 'issued', 'repair'].includes(r.status);
   return (
     <tr className="clickable" onClick={onOpen}>
-      <td onClick={(e) => e.stopPropagation()}>
+      <td className="cell-check" onClick={(e) => e.stopPropagation()}>
         <input type="checkbox" className="check" checked={selected} onChange={onToggle} aria-label={`เลือก ${r.code}`} />
       </td>
-      <td>
+      <td className="cell-primary">
         <div className="row" style={{ gap: 10 }}>
           <Photo src={r.image_path} alt={r.name} icon={Laptop} />
           <div style={{ minWidth: 0 }}>
@@ -199,19 +199,19 @@ function AssetRow({ r, can, selected, onToggle, onOpen, onDelete }) {
         </div>
       </td>
       <CategoryCell r={r} />
-      <td>
+      <td data-label="สถานะ">
         <StatusChip status={r.status} />
         {overdue && <div className="cell-sub danger-text" style={{ marginTop: 4 }}>เกินกำหนด {Math.abs(daysFromToday(r.due_date))} วัน</div>}
       </td>
-      <td>
+      <td data-label="ผู้ถือครอง / สถานที่">
         {r.holder_name || (isHeld(r) && r.department_name)
           ? <><div>{who(r.holder_name, r.department_name)}</div><div className="cell-sub">{r.holder_name ? r.department_name : 'ทั้งแผนก'}</div></>
           : <span className="muted">{r.location_name || '—'}</span>}
       </td>
-      <td className="nowrap">
+      <td className="nowrap" data-label="หมดประกัน">
         {r.warranty_expiry ? <span className={wd < 0 ? 'subtle' : wd <= 30 ? 'danger-text' : ''}>{fmtDate(r.warranty_expiry)}</span> : <span className="subtle">—</span>}
       </td>
-      <td className="mono nowrap">{fmtMoney(r.price)}</td>
+      <td className="mono nowrap" data-label="ราคา">{fmtMoney(r.price)}</td>
       <td className="actions">
         <Menu items={[
           { label: 'ดูรายละเอียด', to: `/assets/${r.id}`, icon: <Eye size={15} /> },
@@ -231,7 +231,7 @@ function StockRow({ r, can, onOpen, onMove, onDelete }) {
   return (
     <tr className="clickable" onClick={onOpen}>
       <td />
-      <td>
+      <td className="cell-primary">
         <div className="row" style={{ gap: 10 }}>
           <Photo src={r.image_path} alt={r.name} icon={Package} />
           <div style={{ minWidth: 0 }}>
@@ -241,16 +241,16 @@ function StockRow({ r, can, onOpen, onMove, onDelete }) {
         </div>
       </td>
       <CategoryCell r={r} />
-      <td><StatusChip status={r.status} /></td>
-      <td>
+      <td data-label="สถานะ"><StatusChip status={r.status} /></td>
+      <td data-label="คงเหลือ">
         <div className="row" style={{ gap: 10 }}>
           <span className="nowrap"><span className="mono" style={{ fontWeight: 600 }}>{fmtNum(r.qty_on_hand)}</span> <span className="muted">{r.unit}</span></span>
           <div className={`stock-bar${low ? ' low' : ''}`} aria-hidden><span style={{ width: `${pct}%` }} /></div>
         </div>
         <div className="cell-sub">จุดสั่งซื้อ {fmtNum(r.reorder_point)}</div>
       </td>
-      <td><span className="subtle">—</span></td>
-      <td className="mono nowrap">{fmtMoney(r.price)}<span className="cell-sub"> /{r.unit}</span></td>
+      <td className="hide-cards"><span className="subtle">—</span></td>
+      <td className="mono nowrap" data-label="ราคา/หน่วย">{fmtMoney(r.price)}<span className="cell-sub"> /{r.unit}</span></td>
       <td className="actions" onClick={(e) => e.stopPropagation()}>
         <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
           {can('consumable.move') && (

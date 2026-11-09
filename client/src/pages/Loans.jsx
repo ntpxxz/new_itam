@@ -47,7 +47,7 @@ export default function Loans() {
           </Empty>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table cards">
               <thead>
                 <tr><th>อุปกรณ์</th><th>ผู้ถือครอง</th><th>สถานะ</th><th>{f.filter === 'issued' ? 'สถานที่' : 'กำหนดคืน'}</th><th className="actions"><span className="sr-only">การทำงาน</span></th></tr>
               </thead>
@@ -56,10 +56,10 @@ export default function Loans() {
                   const d = daysFromToday(a.due_date);
                   return (
                     <tr key={a.id}>
-                      <td><Link to={`/assets/${a.id}`} className="cell-main">{a.name}</Link><div className="tag">{a.asset_tag}</div></td>
-                      <td>{who(a.holder_name, a.department_name) || '—'}<div className="cell-sub">{a.holder_name ? a.department_name : 'ทั้งแผนก'}</div></td>
-                      <td><StatusChip status={a.status} /></td>
-                      <td className="nowrap">
+                      <td className="cell-primary"><Link to={`/assets/${a.id}`} className="cell-main">{a.name}</Link><div className="tag">{a.asset_tag}</div></td>
+                      <td data-label="ผู้ถือครอง">{who(a.holder_name, a.department_name) || '—'}<div className="cell-sub">{a.holder_name ? a.department_name : 'ทั้งแผนก'}</div></td>
+                      <td data-label="สถานะ"><StatusChip status={a.status} /></td>
+                      <td className="nowrap" data-label={a.status === 'borrowed' ? 'กำหนดคืน' : 'สถานที่'}>
                         {a.status === 'borrowed' ? (
                           <>
                             <div>{fmtDate(a.due_date)}</div>
@@ -69,7 +69,7 @@ export default function Loans() {
                           </>
                         ) : <span className="muted">{a.location_name || '—'}</span>}
                       </td>
-                      <td className="actions">
+                      <td className="actions inline">
                         {can('asset.transact') && (
                           <button className="btn btn-sm" onClick={() => setAction({ asset: a, action: { key: 'return', label: 'รับคืน', needs: [] } })}>
                             <ArrowDownLeft size={14} />รับคืน
