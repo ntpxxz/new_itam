@@ -28,7 +28,7 @@ export function ToastProvider({ children }) {
           const I = Icon[t.type];
           return (
             <div key={t.id} className={`toast ${t.type}`} role={t.type === 'error' ? 'alert' : undefined}>
-              <I size={18} aria-hidden />
+              <I size={20} aria-hidden />
               <div>{t.message}</div>
               <button className="icon-btn plain close" style={{ width: 24, height: 24 }} onClick={() => dismiss(t.id)} aria-label="ปิดข้อความ">
                 <X size={14} />

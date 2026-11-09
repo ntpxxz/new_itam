@@ -316,18 +316,20 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
 
 /* ---------- Toast ---------- */
-.toasts { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 8px; max-width: min(400px, calc(100vw - 32px)); }
+.toasts { position: fixed; top: calc(var(--topbar-h) + 8px); left: 16px; right: 16px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
 .toast {
-  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius); background: var(--bg-surface);
-  border: 1px solid var(--border); border-left: 4px solid var(--success); box-shadow: var(--shadow-pop); font-size: 13.5px; animation: slide-in 160ms ease;
+  display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 500;
+  background: var(--success-soft); color: var(--text); border: 1px solid var(--success); border-left-width: 6px;
+  box-shadow: var(--shadow-pop); animation: slide-in 160ms ease;
 }
-.toast.error { border-left-color: var(--danger); }
-.toast.info { border-left-color: var(--brand); }
-.toast > svg { flex: none; margin-top: 1px; }
+.toast.error { background: var(--danger-soft); border-color: var(--danger); }
+.toast.info { background: var(--brand-soft); border-color: var(--brand); }
+.toast > svg { flex: none; }
 .toast.success > svg { color: var(--success); }
-.toast.error > svg { color: var(--danger); }
-.toast .close { margin-left: auto; }
-@keyframes slide-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.toast.error > svg { color: var(--danger-text); }
+.toast.info > svg { color: var(--brand); }
+.toast .close { margin-left: auto; flex: none; }
+@keyframes slide-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ---------- Tabs ---------- */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; }
@@ -454,7 +456,6 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
   .page-head .btn-primary { flex: 1; }
   .modal-backdrop { place-items: end center; padding: 0; }
   .modal { border-radius: 14px 14px 0 0; max-height: 92vh; }
-  .toasts { left: 16px; right: 16px; bottom: 16px; max-width: none; }
   .asset-photo { width: 88px; height: 88px; }
   .toolbar .input-icon { max-width: none; }
   .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
