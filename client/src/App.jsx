@@ -12,6 +12,7 @@ import TagRedirect from './pages/TagRedirect.jsx';
 import Loans from './pages/Loans.jsx';
 import ConsumableDetail from './pages/ConsumableDetail.jsx';
 import HistoryPage from './pages/History.jsx';
+import ActivityPage from './pages/Activity.jsx';
 import Scan from './pages/Scan.jsx';
 import Labels from './pages/Labels.jsx';
 import StockCounts from './pages/StockCounts.jsx';
@@ -94,6 +95,7 @@ export default function App() {
         <Route path="consumables/:id" element={g('consumable.view', <ConsumableDetail />)} />
         <Route path="consumables/:id/edit" element={g('consumable.manage', <AssetForm />)} />
         <Route path="history" element={g('history.view', <HistoryPage />)} />
+        <Route path="activity" element={g(['asset.view', 'consumable.view'], <ActivityPage />)} />
         <Route path="scan" element={g('scan.use', <Scan />)} />
         <Route path="labels" element={g('label.print', <Labels />)} />
         <Route path="stock-counts" element={g('stockcount.manage', <StockCounts />)} />

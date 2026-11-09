@@ -5,13 +5,10 @@ import { relative, fmtDateTime, fmtNum } from '../format.js';
 import { ACTION_META, STOCK_META, ActionIcon } from './actions.jsx';
 import { Card, Loading, Empty } from './ui.jsx';
 
-export default function ActivityFeed({ limit = 12 }) {
-  const { data, loading } = useApi('/api/dashboard/activity', { limit });
+export function FeedList({ rows }) {
   return (
-    <Card title="กิจกรรมล่าสุด" noBody actions={<Link to="/history" className="btn btn-ghost btn-sm">ดูทั้งหมด</Link>}>
-      {loading && !data ? <Loading rows={6} /> : !data?.rows.length ? <Empty icon={Activity} title="ยังไม่มีกิจกรรม" /> : (
         <ul className="feed">
-          {data.rows.map((r) => {
+          {rows.map((r) => {
             const meta = r.kind === 'asset' ? ACTION_META[r.action] : STOCK_META[r.action];
             const to = r.kind === 'asset' ? `/assets/${r.ref_id}` : `/consumables/${r.ref_id}`;
             return (
@@ -32,7 +29,14 @@ export default function ActivityFeed({ limit = 12 }) {
             );
           })}
         </ul>
-      )}
+  );
+}
+
+export default function ActivityFeed({ limit = 5 }) {
+  const { data, loading } = useApi('/api/dashboard/activity', { limit });
+  return (
+    <Card title="กิจกรรมล่าสุด" noBody actions={<Link to="/activity" className="btn btn-ghost btn-sm">ดูทั้งหมด</Link>}>
+      {loading && !data ? <Loading rows={limit} /> : !data?.rows.length ? <Empty icon={Activity} title="ยังไม่มีกิจกรรม" /> : <FeedList rows={data.rows} />}
     </Card>
   );
 }

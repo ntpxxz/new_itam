@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { all, get, setting, ym } from '../db.js';
 import { requirePerm, requireAuth, can } from '../auth.js';
-import { today, addDays, monthStart } from './util.js';
+import { today, addDays, monthStart, paging } from './util.js';
 
 const r = Router();
 
@@ -46,9 +46,10 @@ r.get('/', requirePerm('dashboard.view'), async (req, res) => {
   res.json({ counts, total, overdue, dueSoon, warranty, warrantyDays: days, lowStock, spend, byCategory, issuedThisMonth });
 });
 
-// Merged feed of asset transactions + stock movements
+// Merged feed of asset transactions + stock movements. `limit` = latest N (dashboard); `page` = paged list (/activity).
 r.get('/activity', requireAuth, async (req, res) => {
   const limit = Math.min(100, parseInt(req.query.limit, 10) || 20);
+  const paged = req.query.page !== undefined;
   const parts = [];
   if (can(req.user, 'asset.view')) {
     parts.push(`SELECT 'asset' kind, t.id, t.created_at, t.action, t.note, t.asset_id ref_id, a.asset_tag code, a.name item_name,
@@ -60,8 +61,13 @@ r.get('/activity', requireAuth, async (req, res) => {
         p.name person_name, u.full_name by_name, m.qty, x.unit
       FROM stock_movements m JOIN consumables x ON x.id = m.consumable_id LEFT JOIN people p ON p.id = m.person_id LEFT JOIN users u ON u.id = m.performed_by`);
   }
-  if (!parts.length) return res.json({ rows: [] });
-  res.json({ rows: await all(`SELECT * FROM (${parts.join(' UNION ALL ')}) f ORDER BY created_at DESC, id DESC LIMIT ?`, limit) });
+  if (!parts.length) return res.json(paged ? { rows: [], total: 0, page: 1, pageSize: 30 } : { rows: [] });
+  const feed = `(${parts.join(' UNION ALL ')}) f`;
+  if (!paged) return res.json({ rows: await all(`SELECT * FROM ${feed} ORDER BY created_at DESC, kind, id DESC LIMIT ?`, limit) });
+  const { page, pageSize, offset } = paging(req, 30);
+  const total = (await get(`SELECT COUNT(*) n FROM ${feed}`)).n;
+  const rows = await all(`SELECT * FROM ${feed} ORDER BY created_at DESC, kind, id DESC LIMIT ? OFFSET ?`, pageSize, offset);
+  res.json({ rows, total, page, pageSize });
 });
 
 // Sidebar badges
