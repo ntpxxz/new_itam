@@ -7,6 +7,7 @@ import { useAuth } from '../auth.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { PageHeader, Card, Field, Select, Empty, CategorySelect, KIND_LABEL, DraftNotice, focusFirstError, ActionBar } from '../components/ui.jsx';
 import ItemPicker from '../components/ItemPicker.jsx';
+import Photo from '../components/Photo.jsx';
 import DocList from '../components/DocList.jsx';
 import { fmtMoney, fmtNum, todayISO, daysFromToday } from '../format.js';
 
@@ -154,7 +155,7 @@ export default function Receive() {
           ) : lines.map((l, i) => (l.kind === 'consumable' ? (
             <div key={l.key} className="line-card">
               <span className="line-no mono">{i + 1}</span>
-              <span className="thumb"><Package size={16} /></span>
+              <Photo src={l.item.image_path} alt={l.item.name} icon={Package} lazy={false} />
               <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                 <div className="cell-main">{l.item.name}</div>
                 <div className="tag">{l.item.code} · คงเหลือ {fmtNum(l.item.qty_on_hand)} {l.item.unit}</div>

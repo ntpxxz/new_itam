@@ -72,7 +72,7 @@ export default function ItemPicker({ onPick, accept = () => true, reason = () =>
               <button key={`${r.kind}${r.id}`} type="button" role="option" aria-selected={i === active} aria-disabled={!ok}
                 onMouseEnter={() => setActive(i)} onClick={() => pick(r)}
                 style={{ background: i === active ? 'var(--bg-subtle)' : undefined, opacity: ok ? 1 : 0.5, cursor: ok ? 'pointer' : 'not-allowed', whiteSpace: 'normal' }}>
-                <span className="thumb" style={{ width: 30, height: 30 }}>{r.kind === 'asset' ? <Laptop size={14} /> : <Package size={14} />}</span>
+                <span className="thumb" style={{ width: 30, height: 30 }}>{r.image_path ? <img src={r.image_path} alt="" loading="lazy" /> : r.kind === 'asset' ? <Laptop size={14} /> : <Package size={14} />}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="cell-main" style={{ display: 'block' }}>{r.name}</span>
                   <span className="tag">{r.code}{r.serial_no && ` · SN ${r.serial_no}`} · {r.category_name}</span>
