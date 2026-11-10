@@ -62,7 +62,6 @@ export default function AssetDetail() {
           can('asset.delete') && !['borrowed', 'issued', 'repair'].includes(a.status) && '-',
           can('asset.delete') && !['borrowed', 'issued', 'repair'].includes(a.status) && { label: 'ลบอุปกรณ์', onClick: () => setConfirmDel(true), icon: <Trash2 size={15} />, danger: true },
         ]} />
-        {can('asset.edit') && a.status !== 'scrapped' && <Link to={`/assets/${a.id}/edit`} className="btn"><Pencil size={16} />แก้ไข</Link>}
         {primary && (
           <button className={primary.key === 'scrap' ? 'btn btn-danger' : 'btn btn-primary'} onClick={() => setAction(primary)}>
             {(() => { const I = ACTION_META[primary.key].icon; return <I size={16} />; })()}{primary.label}
@@ -89,7 +88,7 @@ export default function AssetDetail() {
           </Card>
 
           <div className="grid-2">
-            <Card title="รายละเอียด">
+            <Card title="รายละเอียด" actions={can('asset.edit') && a.status !== 'scrapped' && <Link to={`/assets/${a.id}/edit`} className="btn btn-equal"><Pencil size={16} />แก้ไขข้อมูล</Link>}>
               <dl className="dl">
                 <dt>สเปก</dt><dd className="pre-line">{a.specs || '—'}</dd>
                 <dt>สถานที่</dt><dd>{a.location_name ? `${a.location_name}${a.location_branch ? ` · ${a.location_branch}` : ''}` : '—'}</dd>

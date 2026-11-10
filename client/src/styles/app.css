@@ -145,6 +145,7 @@ img { max-width: 100%; display: block; }
 .btn-sm { height: 30px; padding: 4px 10px; font-size: 12.5px; }
 .btn-lg { height: 44px; padding: 10px 18px; font-size: 14px; }
 .btn-block { width: 100%; }
+.btn-equal { min-width: 96px; }
 .icon-btn {
   width: 36px; height: 36px; padding: 0; display: inline-grid; place-items: center; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; flex: none;
@@ -527,6 +528,7 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
   .btn-primary { min-height: 44px; }
   .icon-btn { width: 40px; height: 40px; }
   .page-head .btn-primary { flex: 1; }
+  .page-head .btn-equal { flex: 1; min-height: 44px; }
   .modal-backdrop { place-items: end center; padding: 0; }
   .modal { border-radius: 14px 14px 0 0; max-height: 92vh; }
   .asset-photo { width: 88px; height: 88px; }

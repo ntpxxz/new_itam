@@ -124,17 +124,30 @@ export default function AssetForm() {
 
   if (!loaded) return <Card><Loading rows={8} /></Card>;
 
+  const photoCard = (
+    <Card title="รูปภาพ">
+      <label className="stack" style={{ gap: 10, alignItems: 'center', cursor: 'pointer' }}>
+        <div className="asset-photo" style={{ width: '100%', height: 180 }}>
+          {preview ? <img src={preview} alt="ตัวอย่างรูปอุปกรณ์" /> : <ImagePlus size={28} aria-hidden />}
+        </div>
+        <span className="btn btn-sm"><ImagePlus size={14} />{preview ? 'เปลี่ยนรูป' : 'เลือกรูป'}</span>
+        <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={pickImage} />
+      </label>
+      <p className="field-hint" style={{ textAlign: 'center', marginTop: 8 }}>JPG, PNG, WEBP ไม่เกิน 8 MB · บนมือถือถ่ายรูปได้ทันที</p>
+    </Card>
+  );
+
   return (
     <form onSubmit={submit} noValidate className="stack" style={{ gap: 20 }}>
       <PageHeader
         title={isEdit ? 'แก้ไขอุปกรณ์' : 'เพิ่มอุปกรณ์'}
         crumbs={[{ label: 'อุปกรณ์', to: '/assets' }, ...(isEdit ? [{ label: tag, to: `${base}/${id}` }] : []), { label: isEdit ? 'แก้ไข' : 'เพิ่มใหม่' }]}
       >
-        <Link to={isEdit ? `${base}/${id}` : '/assets'} className="btn">ยกเลิก</Link>
-        <button className="btn btn-primary" disabled={busy || !kind}>{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+        <Link to={isEdit ? `${base}/${id}` : '/assets'} className="btn btn-equal">ยกเลิก</Link>
+        <button className="btn btn-primary btn-equal" disabled={busy || !kind}>{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
       </PageHeader>
 
-      <div className="detail-grid">
+      <div className={kind === 'consumable' ? 'stack' : 'detail-grid'}>
         <div className="stack">
           <Card title="ข้อมูลอุปกรณ์">
             <div className="form-grid">
@@ -228,18 +241,7 @@ export default function AssetForm() {
         </div>
 
         <div className="stack">
-          {kind && (
-            <Card title="รูปภาพ">
-              <label className="stack" style={{ gap: 10, alignItems: 'center', cursor: 'pointer' }}>
-                <div className="asset-photo" style={{ width: '100%', height: 180 }}>
-                  {preview ? <img src={preview} alt="ตัวอย่างรูปอุปกรณ์" /> : <ImagePlus size={28} aria-hidden />}
-                </div>
-                <span className="btn btn-sm"><ImagePlus size={14} />{preview ? 'เปลี่ยนรูป' : 'เลือกรูป'}</span>
-                <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={pickImage} />
-              </label>
-              <p className="field-hint" style={{ textAlign: 'center', marginTop: 8 }}>JPG, PNG, WEBP ไม่เกิน 8 MB · บนมือถือถ่ายรูปได้ทันที</p>
-            </Card>
-          )}
+          {kind === 'asset' && photoCard}
           {kind && (
             <Card title="การจัดเก็บ">
               <div className="stack" style={{ gap: 14 }}>
@@ -256,6 +258,7 @@ export default function AssetForm() {
               </div>
             </Card>
           )}
+          {kind === 'consumable' && photoCard}
           {!kind && (
             <Card>
               <div className="empty" style={{ padding: 24 }}><Package size={28} /><div className="text-sm">ช่องข้อมูลจะปรากฏหลังเลือกหมวดหมู่</div></div>

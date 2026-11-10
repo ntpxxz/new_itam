@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { PackageMinus, PackagePlus, SlidersHorizontal, Pencil, Trash2, AlertTriangle, Package, MapPin } from 'lucide-react';
-import { useApi, useLookup } from '../hooks.js';
+import { PackageMinus, PackagePlus, SlidersHorizontal, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react';
+import { useApi } from '../hooks.js';
 import { useAuth } from '../auth.jsx';
 import { api } from '../api.js';
 import { useToast } from '../components/Toast.jsx';
-import { PageHeader, Card, Loading, Empty, Menu, Confirm, Modal, Field, Select } from '../components/ui.jsx';
+import { PageHeader, Card, Loading, Empty, Menu, Confirm } from '../components/ui.jsx';
 import { MoveDialog } from '../components/ConsumableDialogs.jsx';
 import ItemPhoto from '../components/ItemPhoto.jsx';
 import { STOCK_META, ActionIcon } from '../components/actions.jsx';
@@ -19,7 +19,6 @@ export default function ConsumableDetail() {
   const { data, loading, reload } = useApi(`/api/consumables/${id}`);
   const [move, setMove] = useState(null);
   const [del, setDel] = useState(false);
-  const [moveLoc, setMoveLoc] = useState(false);
 
   if (loading && !data) return <Card><Loading rows={8} /></Card>;
   if (!data) return <Empty title="ไม่พบวัสดุ"><Link to="/consumables">กลับไปหน้ารายการ</Link></Empty>;
@@ -32,8 +31,7 @@ export default function ConsumableDetail() {
       <PageHeader title={x.name} crumbs={[{ label: 'อุปกรณ์', to: '/assets' }, { label: x.category_name, to: `/assets?category_id=${x.category_id}` }, { label: x.sku }]}>
         <Menu buttonClass="icon-btn" items={[
           can('consumable.move') && { label: 'ปรับยอด (ตรวจนับ)', onClick: () => setMove('adjust'), icon: <SlidersHorizontal size={15} /> },
-          can('consumable.manage') && { label: 'แก้ไขข้อมูล', to: `/consumables/${x.id}/edit`, icon: <Pencil size={15} /> },
-          can('consumable.manage') && '-',
+          can('consumable.move') && can('consumable.manage') && '-',
           can('consumable.manage') && { label: 'ลบรายการ', onClick: () => setDel(true), icon: <Trash2 size={15} />, danger: true },
         ]} />
         {can('consumable.move') && <button className="btn" onClick={() => setMove('in')}><PackagePlus size={16} />รับเข้า</button>}
@@ -57,7 +55,7 @@ export default function ConsumableDetail() {
 
       <div className="detail-grid">
         <div className="stack">
-          <Card title="ข้อมูล">
+          <Card title="ข้อมูล" actions={can('consumable.manage') && <Link to={`/consumables/${x.id}/edit`} className="btn btn-equal"><Pencil size={16} />แก้ไขข้อมูล</Link>}>
             <div className="asset-hero">
               <ItemPhoto src={x.image_path} alt={x.name} icon={Package} uploadUrl={`/api/consumables/${x.id}/image`}
                 canEdit={can('consumable.manage')} onDone={reload} />
@@ -65,11 +63,7 @@ export default function ConsumableDetail() {
                 <dt>SKU</dt><dd className="mono">{x.sku}</dd>
                 <dt>หมวดหมู่</dt><dd>{x.category_name}</dd>
                 <dt>ราคา/หน่วย</dt><dd className="mono">{fmtMoney(x.unit_cost)}</dd>
-                <dt>สถานที่เก็บ</dt>
-                <dd className="row-wrap" style={{ gap: 6, justifyContent: 'space-between' }}>
-                  <span>{x.location_name || '—'}</span>
-                  {can('consumable.manage') && <button className="btn btn-sm" onClick={() => setMoveLoc(true)}><MapPin size={14} />เปลี่ยนที่เก็บ</button>}
-                </dd>
+                <dt>สถานที่เก็บ</dt><dd>{x.location_name || '—'}</dd>
                 <dt>ผู้ขาย</dt><dd>{x.vendor_name || '—'}</dd>
                 <dt>หมายเหตุ</dt><dd>{x.notes || '—'}</dd>
               </dl>
@@ -121,7 +115,6 @@ export default function ConsumableDetail() {
       </div>
 
       {move && <MoveDialog item={x} type={move} onClose={() => setMove(null)} onDone={() => { setMove(null); reload(); }} />}
-      {moveLoc && <LocationDialog item={x} onClose={() => setMoveLoc(false)} onDone={() => { setMoveLoc(false); reload(); }} />}
       {del && (
         <Confirm title={`ลบ ${x.name}?`} danger confirmLabel="ลบรายการ" onClose={() => setDel(false)}
           message="รายการจะถูกซ่อนจากระบบ แต่ประวัติความเคลื่อนไหวยังถูกเก็บไว้"
@@ -131,30 +124,3 @@ export default function ConsumableDetail() {
   );
 }
 
-function LocationDialog({ item, onClose, onDone }) {
-  const toast = useToast();
-  const locs = useLookup('locations');
-  const [loc, setLoc] = useState(item.location_id || '');
-  const [busy, setBusy] = useState(false);
-  const save = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await api.put(`/api/consumables/${item.id}`, { location_id: loc || null });
-      toast.success('บันทึกสถานที่เก็บแล้ว');
-      onDone();
-    } catch (ex) { toast.error(ex); } finally { setBusy(false); }
-  };
-  return (
-    <Modal title={`เปลี่ยนสถานที่เก็บ · ${item.name}`} onClose={onClose} footer={(
-      <><button className="btn" onClick={onClose}>ยกเลิก</button><button className="btn btn-primary" type="submit" form="loc-form" disabled={busy || String(loc) === String(item.location_id || '')}>บันทึก</button></>
-    )}>
-      <form id="loc-form" onSubmit={save}>
-        <Field label="สถานที่เก็บ" hint={`ตอนนี้: ${item.location_name || 'ยังไม่ระบุ'} · การเปลี่ยนถูกบันทึกใน Audit log`}>
-          <Select value={loc} onChange={setLoc} placeholder="— ไม่ระบุ —"
-            options={locs.map((l) => ({ value: l.id, label: l.branch ? `${l.name} · ${l.branch}` : l.name }))} />
-        </Field>
-      </form>
-    </Modal>
-  );
-}
