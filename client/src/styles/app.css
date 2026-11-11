@@ -347,7 +347,7 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
 .menu.fixed { position: fixed; top: auto; z-index: 90; }
 .menu button, .menu a {
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: transparent;
-  border-radius: var(--radius-sm); font-size: 13px; color: var(--text); cursor: pointer; text-decoration: none; white-space: nowrap;
+  border-radius: var(--radius-sm); font-size: 13px; color: var(--text); cursor: pointer; text-decoration: none; white-space: nowrap; text-align: left;
 }
 .menu button:hover, .menu a:hover, .menu button:focus-visible, .menu a:focus-visible { background: var(--bg-subtle); outline: none; }
 .menu .danger { color: var(--danger-text); }
