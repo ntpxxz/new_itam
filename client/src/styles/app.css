@@ -416,7 +416,14 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
 
 /* ---------- Receive / issue lines ---------- */
 .line-card { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-surface); }
-.line-sn { display: flex; flex-direction: column; gap: 2px; flex: 0 1 200px; min-width: 160px; }
+.line-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.line-col-label { font-size: 12px; color: var(--text-muted); }
+.line-ctl { display: flex; align-items: center; gap: 4px; min-height: 38px; }
+.line-sn { flex: 1 1 200px; }
+.line-qty { flex: 0 0 auto; }
+@media (min-width: 900px) {
+  .issue-line { display: grid; grid-template-columns: 22px 36px minmax(0, 1fr) 220px 232px 36px; }
+}
 .line-sn .input[readonly] { background: var(--bg-subtle); }
 .line-no { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-subtle); color: var(--text-muted); font-size: 11px; display: grid; place-items: center; flex: none; }
 .line-field { width: 130px; }
@@ -559,7 +566,7 @@ a.kpi:hover { text-decoration: none; border-color: var(--border-strong); }
   .shell:has(.action-bar) .ai-fab { bottom: 132px; }
 }
 @media (max-width: 459px) {
-  .line-sn { flex: 1 1 100%; }
+  .line-sn, .line-qty { flex: 1 1 100%; }
   .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .kpi { padding: 12px; gap: 4px; }
   .kpi-value { font-size: 22px; }

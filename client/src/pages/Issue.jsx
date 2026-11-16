@@ -167,35 +167,36 @@ export default function Issue() {
           {!lines.length ? (
             <Empty icon={PackageMinus} title="ยังไม่มีรายการ">สแกนหรือค้นหาอุปกรณ์ที่พร้อมใช้ หรือรายการนับจำนวนที่มีในสต็อก</Empty>
           ) : lines.map((l, i) => (
-            <div key={l.key} className="line-card">
+            <div key={l.key} className="line-card issue-line">
               <span className="line-no mono">{i + 1}</span>
               <span className="thumb">{l.item.kind === 'asset' ? <Laptop size={16} /> : <Package size={16} />}</span>
               <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                 <div className="cell-main">{l.item.name}</div>
                 <div className="tag">{l.item.code} · {l.item.category_name}</div>
+                {l.item.kind === 'consumable' && <div className="cell-sub">คงเหลือหลังเบิก {fmtNum(l.item.qty_on_hand - l.qty)} {l.item.unit}</div>}
               </div>
-              <label className="line-sn">
-                <span className="cell-sub">Serial Number</span>
+              <label className="line-col line-sn">
+                <span className="line-col-label">Serial Number</span>
                 {l.item.kind === 'asset' && l.item.serial_no
                   ? <input className="input mono" value={l.item.serial_no} readOnly aria-label={`Serial Number ${l.item.name}`} title="SN ที่บันทึกไว้กับอุปกรณ์" />
                   : <input className="input mono" value={l.sn || ''} maxLength={100} onChange={(e) => setSn(l.key, e.target.value)}
                       placeholder="กรอก SN (ไม่มีเว้นว่างได้)" aria-label={`Serial Number ${l.item.name}`} />}
               </label>
-              {l.item.kind === 'asset' ? (
-                <div className="row" style={{ gap: 6 }}>
-                  <StatusChip status="available" /><span aria-hidden>→</span><StatusChip status={head.mode === 'borrow' ? 'borrowed' : 'issued'} />
-                </div>
-              ) : (
-                <div className="stack" style={{ gap: 2, alignItems: 'flex-end' }}>
-                  <div className="row" style={{ gap: 4 }}>
+              <div className="line-col line-qty">
+                <span className="line-col-label">{l.item.kind === 'asset' ? 'สถานะ' : 'จำนวน'}</span>
+                {l.item.kind === 'asset' ? (
+                  <div className="line-ctl" style={{ gap: 8 }}>
+                    <StatusChip status="available" /><span aria-hidden>→</span><StatusChip status={head.mode === 'borrow' ? 'borrowed' : 'issued'} />
+                  </div>
+                ) : (
+                  <div className="line-ctl">
                     <button className="icon-btn" onClick={() => setQty(l.key, l.qty - 1)} aria-label="ลดจำนวน" disabled={l.qty <= 1}><Minus size={14} /></button>
                     <QtyInput value={l.qty} max={l.item.qty_on_hand} onChange={(q) => setQty(l.key, q)} label={`จำนวน ${l.item.name}`} />
                     <button className="icon-btn" onClick={() => setQty(l.key, l.qty + 1)} aria-label="เพิ่มจำนวน" disabled={l.qty >= l.item.qty_on_hand}><Plus size={14} /></button>
                     <span className="muted" style={{ fontSize: 13, minWidth: 32 }}>{l.item.unit}</span>
                   </div>
-                  <span className="cell-sub">คงเหลือหลังเบิก {fmtNum(l.item.qty_on_hand - l.qty)} {l.item.unit}</span>
-                </div>
-              )}
+                )}
+              </div>
               <button className="icon-btn plain" onClick={() => remove(l.key)} aria-label={`ลบรายการ ${l.item.name}`}><Trash2 size={16} /></button>
             </div>
           ))}
