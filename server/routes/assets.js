@@ -312,6 +312,17 @@ export async function applyAction(req, assetId, action, input, docId = null) {
   if (person_id && !(await get('SELECT 1 AS x FROM people WHERE id = ? AND deleted_at IS NULL', person_id))) throw bad('ไม่พบพนักงานที่เลือก');
 
   const patch = {};
+  // เบิก/ยืม may record the SN of an asset that was received without one; an asset's existing SN is kept.
+  const serial = String(b.serial_no ?? '').trim() || null;
+  if (serial) {
+    if (serial.length > 100) throw bad('Serial Number ยาวเกิน 100 ตัวอักษร');
+    if (a.serial_no && serial !== a.serial_no) throw bad(`${a.asset_tag}: Serial Number ไม่ตรงกับที่บันทึกไว้ (${a.serial_no})`);
+    if (!a.serial_no) {
+      const dup = await get('SELECT asset_tag FROM assets WHERE serial_no = ? AND deleted_at IS NULL AND id <> ?', serial, a.id);
+      if (dup) throw bad(`Serial Number นี้ซ้ำกับอุปกรณ์ ${dup.asset_tag}`);
+      patch.serial_no = serial;
+    }
+  }
   const to = def.to ?? a.status;
   patch.status = to;
   switch (action) {
@@ -346,12 +357,12 @@ export async function applyAction(req, assetId, action, input, docId = null) {
     const keys = Object.keys(patch);
     await run(`UPDATE assets SET ${keys.map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`, ...keys.map((k) => patch[k]), now(), a.id);
     const returning = ['return', 'repair_in'].includes(action);
-    await run(`INSERT INTO asset_transactions (asset_id, action, from_status, to_status, person_id, department_id, location_id, due_date, note, evidence_path, cost, performed_by, doc_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    await run(`INSERT INTO asset_transactions (asset_id, action, from_status, to_status, person_id, department_id, location_id, due_date, note, evidence_path, cost, serial_no, performed_by, doc_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       a.id, action, a.status, to,
       person_id ?? (returning ? a.holder_person_id : null),
       patch.department_id ?? department_id, patch.location_id ?? location_id,
-      patch.due_date ?? null, note, evidence, cost, req.user.id, docId);
+      patch.due_date ?? null, note, evidence, cost, patch.serial_no || a.serial_no, req.user.id, docId);
     await audit(req, 'asset', a.id, action, a, await get('SELECT * FROM assets WHERE id = ?', a.id));
   });
   return to;

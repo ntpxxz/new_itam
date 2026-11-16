@@ -98,6 +98,7 @@ available ──transfer──▶ available (location/department move)
 - Receive "รายการใหม่" line: the category picker lists **both** kinds; the chosen category decides the line. รายชิ้น → new assets; นับจำนวน → `createConsumable()` (SKU barcode, unit, reorder point; needs `consumable.manage`) then `moveStock('in')`, same transaction.
 - Receive date (`doc_date`) may be backdated (not future); optional slip `purchase_date` must be ≤ `doc_date` and defaults to it. Slip number month and asset-tag year follow those dates.
 - Issue: mode `issue` (เบิกถาวร) or `borrow` (due date). Assets → `applyAction()`; consumables → `moveStock('out')`. Consumables cannot be borrowed.
+- Every issue line has a Serial Number field (empty allowed) → `asset_transactions.serial_no` / `stock_movements.serial_no`. An asset's existing SN is shown read-only and must match; an asset without one gets the typed SN saved on it (dup-checked).
 - Issue date (`doc_date`) may be backdated: not in the future, and for each asset not before its `received_date` or latest movement. Borrow due date must be ≥ `doc_date`. History rows keep `created_at` as the record time; the effective date comes from `documents.doc_date` (shown as วันที่ … · บันทึก …).
 - Always reuse `applyAction` / `createAsset` / `moveStock` so rules, history and audit stay in one place.
 

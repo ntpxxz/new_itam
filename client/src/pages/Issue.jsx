@@ -74,6 +74,7 @@ export default function Issue() {
       return [...ls, { key: seq++, item: row, qty: 1 }];
     });
   };
+  const setSn = (key, sn) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, sn } : l)));
   const setQty = (key, q) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, qty: Math.max(1, Math.min(l.item.qty_on_hand, q || 1)) } : l)));
   const remove = (key) => {
     const at = lines.findIndex((l) => l.key === key);
@@ -101,8 +102,8 @@ export default function Issue() {
         ...who,
         due_date: head.mode === 'borrow' ? head.due_date : null,
         lines: lines.map((l) => (l.item.kind === 'asset'
-          ? { kind: 'asset', asset_id: l.item.id }
-          : { kind: 'consumable', consumable_id: l.item.id, qty: l.qty })),
+          ? { kind: 'asset', asset_id: l.item.id, serial_no: l.item.serial_no ? null : l.sn?.trim() || null }
+          : { kind: 'consumable', consumable_id: l.item.id, qty: l.qty, serial_no: l.sn?.trim() || null })),
       });
       clearLookupCache();
       draft.clear();
@@ -171,8 +172,15 @@ export default function Issue() {
               <span className="thumb">{l.item.kind === 'asset' ? <Laptop size={16} /> : <Package size={16} />}</span>
               <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                 <div className="cell-main">{l.item.name}</div>
-                <div className="tag">{l.item.code}{l.item.serial_no && ` · SN ${l.item.serial_no}`} · {l.item.category_name}</div>
+                <div className="tag">{l.item.code} · {l.item.category_name}</div>
               </div>
+              <label className="line-sn">
+                <span className="cell-sub">Serial Number</span>
+                {l.item.kind === 'asset' && l.item.serial_no
+                  ? <input className="input mono" value={l.item.serial_no} readOnly aria-label={`Serial Number ${l.item.name}`} title="SN ที่บันทึกไว้กับอุปกรณ์" />
+                  : <input className="input mono" value={l.sn || ''} maxLength={100} onChange={(e) => setSn(l.key, e.target.value)}
+                      placeholder="กรอก SN (ไม่มีเว้นว่างได้)" aria-label={`Serial Number ${l.item.name}`} />}
+              </label>
               {l.item.kind === 'asset' ? (
                 <div className="row" style={{ gap: 6 }}>
                   <StatusChip status="available" /><span aria-hidden>→</span><StatusChip status={head.mode === 'borrow' ? 'borrowed' : 'issued'} />

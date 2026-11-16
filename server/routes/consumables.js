@@ -194,6 +194,8 @@ export async function moveStock(req, consumableId, input, docId = null) {
   if (type === 'adjust' && !String(note || '').trim()) throw bad('กรุณาระบุเหตุผลการปรับยอด เช่น ผลตรวจนับ');
   const received = type === 'in' ? checkReceived(input.received_date) : null;
   const unit_cost = toNum(input.unit_cost);
+  const serial_no = String(input.serial_no ?? '').trim() || null;
+  if (serial_no && serial_no.length > 100) throw bad('Serial Number ยาวเกิน 100 ตัวอักษร');
 
   return tx(async () => {
     // Recipient is optional for a plain stock-out, but if given it is resolved the same way as for assets.
@@ -213,9 +215,9 @@ export async function moveStock(req, consumableId, input, docId = null) {
       moved = qty - item.qty_on_hand;
     }
     await run('UPDATE consumables SET qty_on_hand = ?, updated_at = ? WHERE id = ?', balance, now(), item.id);
-    await run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, person_id, department_id, unit_cost, received_date, note, performed_by, doc_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.id, type, moved, balance, person_id, department_id,
-      unit_cost ?? (type === 'in' ? item.unit_cost : null), received, note, req.user.id, docId);
+    await run(`INSERT INTO stock_movements (consumable_id, type, qty, balance_after, person_id, department_id, unit_cost, received_date, note, serial_no, performed_by, doc_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, item.id, type, moved, balance, person_id, department_id,
+      unit_cost ?? (type === 'in' ? item.unit_cost : null), received, note, serial_no, req.user.id, docId);
     await audit(req, 'consumable', item.id, `stock_${type}`, { qty_on_hand: item.qty_on_hand }, { qty_on_hand: balance, qty: moved, note });
     return { balance, low: balance <= item.reorder_point };
   });

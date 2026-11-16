@@ -185,6 +185,7 @@ CREATE TABLE asset_transactions (
   note          NVARCHAR(MAX) NULL,
   evidence_path NVARCHAR(500) NULL,
   cost          DECIMAL(14,2) NULL,
+  serial_no     NVARCHAR(100) NULL,
   performed_by  INT NULL REFERENCES users(id),
   doc_id        INT NULL REFERENCES documents(id),
   created_at    DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
@@ -202,6 +203,7 @@ CREATE TABLE stock_movements (
   unit_cost     DECIMAL(14,2) NULL,
   received_date DATE NULL,
   note          NVARCHAR(MAX) NULL,
+  serial_no     NVARCHAR(100) NULL,
   performed_by  INT NULL REFERENCES users(id),
   doc_id        INT NULL REFERENCES documents(id),
   created_at    DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
@@ -369,6 +371,8 @@ IF COL_LENGTH(N'dbo.pending_receipts', N'deleted_at') IS NULL ALTER TABLE pendin
 IF COL_LENGTH(N'dbo.pending_receipts', N'order_line_id') IS NULL ALTER TABLE pending_receipts ADD order_line_id INT NULL REFERENCES order_lines(id);
 IF COL_LENGTH(N'dbo.order_lines', N'unit_price') IS NULL ALTER TABLE order_lines ADD unit_price DECIMAL(14,2) NULL;
 IF COL_LENGTH(N'dbo.pending_receipts', N'po_id') IS NULL ALTER TABLE pending_receipts ADD po_id INT NULL REFERENCES purchase_orders(id);
+IF COL_LENGTH(N'dbo.asset_transactions', N'serial_no') IS NULL ALTER TABLE asset_transactions ADD serial_no NVARCHAR(100) NULL;
+IF COL_LENGTH(N'dbo.stock_movements', N'serial_no') IS NULL ALTER TABLE stock_movements ADD serial_no NVARCHAR(100) NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_pending_status') CREATE INDEX idx_pending_status ON pending_receipts(status, batch_id);

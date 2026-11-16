@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS asset_transactions (
   note          TEXT,
   evidence_path TEXT,
   cost          REAL,
+  serial_no     TEXT,
   performed_by  INTEGER REFERENCES users(id),
   doc_id        INTEGER REFERENCES documents(id),
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -190,6 +191,7 @@ CREATE TABLE IF NOT EXISTS stock_movements (
   unit_cost      REAL,
   received_date  TEXT,
   note           TEXT,
+  serial_no      TEXT,
   performed_by   INTEGER REFERENCES users(id),
   doc_id         INTEGER REFERENCES documents(id),
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))

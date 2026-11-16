@@ -171,6 +171,8 @@ if (MSSQL) {
   addColumn('pending_receipts', 'order_line_id', 'INTEGER REFERENCES order_lines(id)');
   addColumn('order_lines', 'unit_price', 'REAL');
   addColumn('pending_receipts', 'po_id', 'INTEGER REFERENCES purchase_orders(id)');
+  addColumn('asset_transactions', 'serial_no', 'TEXT');
+  addColumn('stock_movements', 'serial_no', 'TEXT');
   // Indexes on migrated columns go here, after the column is guaranteed to exist.
   db.exec(`CREATE INDEX IF NOT EXISTS idx_atx_doc ON asset_transactions(doc_id) WHERE doc_id IS NOT NULL;
            CREATE INDEX IF NOT EXISTS idx_sm_doc ON stock_movements(doc_id) WHERE doc_id IS NOT NULL;

@@ -121,11 +121,11 @@ export async function createIssueDoc(req, b) {
       try {
         if (l.kind === 'consumable') {
           if (!can(req.user, 'consumable.move')) throw new HttpError(403, 'คุณไม่มีสิทธิ์เบิกวัสดุสิ้นเปลือง');
-          await moveStock(req, l.consumable_id, { type: 'out', qty: l.qty, ...who, note: [doc_no, l.note || b.note].filter(Boolean).join(' · ') }, docId);
+          await moveStock(req, l.consumable_id, { type: 'out', qty: l.qty, serial_no: l.serial_no, ...who, note: [doc_no, l.note || b.note].filter(Boolean).join(' · ') }, docId);
           units += toInt(l.qty);
         } else if (l.kind === 'asset') {
           await checkNotBeforeHistory(l.asset_id, doc_date);
-          await applyAction(req, l.asset_id, mode, { ...who, location_id: b.location_id, due_date, min_due: doc_date, note: [doc_no, l.note || b.note].filter(Boolean).join(' · ') }, docId);
+          await applyAction(req, l.asset_id, mode, { ...who, serial_no: l.serial_no, location_id: b.location_id, due_date, min_due: doc_date, note: [doc_no, l.note || b.note].filter(Boolean).join(' · ') }, docId);
           assets++;
         } else throw bad('ประเภทรายการไม่ถูกต้อง');
       } catch (e) { throw lineError(i, e); }
@@ -162,10 +162,10 @@ r.get('/:id', requirePerm('asset.view', 'consumable.view'), async (req, res) => 
   const doc = await get(`${DOC_SELECT} WHERE d.id = ?`, toInt(req.params.id));
   if (!doc) throw notFound('เอกสาร');
   const lines = [
-    ...await all(`SELECT 'asset' kind, t.id, a.id ref_id, a.asset_tag code, a.name, c.name category_name, a.serial_no, 1 qty, 'ชิ้น' unit,
+    ...await all(`SELECT 'asset' kind, t.id, a.id ref_id, a.asset_tag code, a.name, c.name category_name, COALESCE(t.serial_no, a.serial_no) serial_no, 1 qty, 'ชิ้น' unit,
               t.cost unit_price, t.action, t.due_date FROM asset_transactions t JOIN assets a ON a.id = t.asset_id
               JOIN categories c ON c.id = a.category_id WHERE t.doc_id = ? ORDER BY t.id`, doc.id),
-    ...await all(`SELECT 'consumable' kind, m.id, x.id ref_id, x.sku code, x.name, c.name category_name, NULL serial_no, ABS(m.qty) qty, x.unit,
+    ...await all(`SELECT 'consumable' kind, m.id, x.id ref_id, x.sku code, x.name, c.name category_name, m.serial_no, ABS(m.qty) qty, x.unit,
               m.unit_cost unit_price, m.type action, NULL due_date FROM stock_movements m JOIN consumables x ON x.id = m.consumable_id
               JOIN categories c ON c.id = x.category_id WHERE m.doc_id = ? ORDER BY m.id`, doc.id),
   ];
